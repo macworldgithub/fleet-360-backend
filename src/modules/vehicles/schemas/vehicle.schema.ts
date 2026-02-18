@@ -53,7 +53,7 @@ export class Vehicle {
   fuelType: FuelType;
 
   @Prop({ default: 0 })
-  odometerCurrent: number;
+  odometerInKms: number;
 
   @Prop({ enum: VehicleStatus, default: VehicleStatus.ACTIVE })
   status: VehicleStatus;
