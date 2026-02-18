@@ -5,7 +5,6 @@ import {
   IsEnum,
   IsOptional,
   IsDateString,
-  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FuelType, LeaseType, VehicleStatus } from '../schemas/vehicle.schema';
@@ -49,10 +48,10 @@ export class CreateVehicleDto {
   @IsOptional()
   odometerInKms?: number;
 
-  @ApiPropertyOptional({ enum: VehicleStatus, example: VehicleStatus.ACTIVE })
+  @ApiPropertyOptional({ enum: VehicleStatus, example: VehicleStatus.ACTIVATE })
   @IsEnum(VehicleStatus)
   @IsOptional()
-  status?: VehicleStatus;
+  vehicleStatus?: VehicleStatus;
 
   @ApiPropertyOptional({ example: '2024-01-15' })
   @IsDateString()

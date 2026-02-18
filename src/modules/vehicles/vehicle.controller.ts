@@ -58,4 +58,16 @@ export class VehicleController {
   remove(@Param('vehicleId') vehicleId: string) {
     return this.vehicleService.remove(vehicleId);
   }
+
+  @Patch(':vehicleId/activate')
+  @ApiOperation({ summary: 'Activate a vehicle' })
+  activate(@Param('vehicleId') vehicleId: string) {
+    return this.vehicleService.activate(vehicleId);
+  }
+
+  @Patch(':vehicleId/deactivate')
+  @ApiOperation({ summary: 'Deactivate a vehicle' })
+  deactivate(@Param('vehicleId') vehicleId: string) {
+    return this.vehicleService.deactivate(vehicleId);
+  }
 }

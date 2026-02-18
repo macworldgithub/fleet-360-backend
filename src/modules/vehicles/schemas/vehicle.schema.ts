@@ -11,10 +11,8 @@ export enum FuelType {
 }
 
 export enum VehicleStatus {
-  ACTIVE = 'ACTIVE',
-  IN_SERVICE = 'IN_SERVICE',
-  SOLD = 'SOLD',
-  ARCHIVED = 'ARCHIVED',
+  ACTIVATE = 'ACTIVATE',
+  DEACTIVATE = 'DEACTIVATE',
 }
 
 export enum LeaseType {
@@ -55,8 +53,8 @@ export class Vehicle {
   @Prop({ default: 0 })
   odometerInKms: number;
 
-  @Prop({ enum: VehicleStatus, default: VehicleStatus.ACTIVE })
-  status: VehicleStatus;
+  @Prop({ enum: VehicleStatus, default: VehicleStatus.ACTIVATE })
+  vehicleStatus: VehicleStatus;
 
   @Prop({ type: Date })
   purchaseDate: Date;
