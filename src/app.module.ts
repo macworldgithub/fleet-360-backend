@@ -8,6 +8,7 @@ import { AgencyAuthModule } from './agency-auth/agency-auth.module';
 import { VehicleModule } from './modules/vehicles/vehicle.module';
 import { OfficesModule } from './offices/dto/offices.module';
 import { DriverModule } from './modules/drivers/driver.module';
+import { KmLogsModule } from './modules/km-logs/km-logs.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { DriverModule } from './modules/drivers/driver.module';
     VehicleModule,
     OfficesModule,
     DriverModule,
+    KmLogsModule,
   ],
 })
 export class AppModule {}
