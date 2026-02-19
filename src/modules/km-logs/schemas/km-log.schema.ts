@@ -51,8 +51,12 @@ export class KmLog {
   @Prop({ type: String, default: null })
   notes: string | null;
 
-  @Prop({ default: false })
-  isDeleted: boolean;
+  @Prop({ type: String, default: null })
+  businessPurpose: string | null;
+
+  /** Reference to the logbook session this trip belongs to (ATO compliance) */
+  @Prop({ type: Types.ObjectId, default: null, index: true })
+  logbookSessionId: Types.ObjectId | null;
 }
 
 export const KmLogSchema = SchemaFactory.createForClass(KmLog);

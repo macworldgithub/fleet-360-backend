@@ -78,7 +78,7 @@ export class KmLogsController {
   }
 
   @Delete(':logId')
-  @ApiOperation({ summary: 'Delete KM log by ID (soft delete)' })
+  @ApiOperation({ summary: 'Delete KM log by ID' })
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
   remove(@Param('logId') logId: string) {
     return this.kmLogsService.remove(logId);

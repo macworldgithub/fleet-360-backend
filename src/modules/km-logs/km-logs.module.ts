@@ -4,9 +4,17 @@ import { KmLogsController } from './km-logs.controller';
 import { KmLogsService } from './km-logs.service';
 import { KmLog, KmLogSchema } from './schemas/km-log.schema';
 
+import {
+  LogbookSession,
+  LogbookSessionSchema,
+} from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
+
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: KmLog.name, schema: KmLogSchema }]),
+    MongooseModule.forFeature([
+      { name: KmLog.name, schema: KmLogSchema },
+      { name: LogbookSession.name, schema: LogbookSessionSchema },
+    ]),
   ],
   controllers: [KmLogsController],
   providers: [KmLogsService],

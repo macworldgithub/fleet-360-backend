@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { KmLog, KmLogDocument } from './schemas/km-log.schema';
+import { KmLog, KmLogDocument, TripType } from './schemas/km-log.schema';
+import {
+  LogbookSession,
+  LogbookSessionDocument,
+} from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
 import { CreateKmLogDto } from './dto/create-km-log.dto';
 import { UpdateKmLogDto } from './dto/update-km-log.dto';
 
@@ -14,6 +18,8 @@ export class KmLogsService {
   constructor(
     @InjectModel(KmLog.name)
     private kmLogModel: Model<KmLogDocument>,
+    @InjectModel(LogbookSession.name)
+    private sessionModel: Model<LogbookSessionDocument>,
   ) {}
 
   private validateObjectId(id: string, label: string) {
@@ -55,15 +61,23 @@ export class KmLogsService {
       dto.endOdometerInKms,
     );
 
+    // ── Find the OLDEST active logbook session for this vehicle ──
+    const vehicleOid = new Types.ObjectId(dto.vehicleId);
+    const activeSession = await this.sessionModel
+      .findOne({ vehicleId: vehicleOid, isLocked: false })
+      .sort({ createdAt: 1 }) // Pick the first one created
+      .exec();
+
     const payload: any = {
-      vehicleId: new Types.ObjectId(dto.vehicleId),
+      vehicleId: vehicleOid,
       tripDate: new Date(dto.tripDate),
       startOdometerInKms: dto.startOdometerInKms,
       endOdometerInKms: dto.endOdometerInKms,
       distanceInKms,
       tripType: dto.tripType,
       notes: dto.notes ?? null,
-      isDeleted: false,
+      businessPurpose: dto.businessPurpose ?? null,
+      logbookSessionId: activeSession ? activeSession._id : null,
     };
 
     if (dto.agencyId) payload.agencyId = new Types.ObjectId(dto.agencyId);
@@ -71,11 +85,44 @@ export class KmLogsService {
 
     const log = await this.kmLogModel.create(payload);
 
+    // ── Sync session odometer and totals ──
+    if (activeSession) {
+      const isBusiness = dto.tripType === TripType.BUSINESS;
+
+      // Update session totals
+      activeSession.endOdometerInKms = dto.endOdometerInKms;
+      activeSession.totalKms += distanceInKms;
+
+      if (isBusiness) {
+        activeSession.businessKms += distanceInKms;
+      } else {
+        activeSession.privateKms += distanceInKms;
+      }
+
+      // Re-calculate business use percentage (two decimal precision)
+      activeSession.businessUsePercentage =
+        activeSession.totalKms > 0
+          ? Math.round((activeSession.businessKms / activeSession.totalKms) * 10000) / 100
+          : 0;
+
+      // Update startOdometer ONLY if this is the first trip ever added to the session
+      // (Check count of trips linked to this session)
+      const linkedTripsCount = await this.kmLogModel.countDocuments({
+        logbookSessionId: activeSession._id,
+      });
+
+      if (linkedTripsCount === 1) {
+        activeSession.startOdometerInKms = dto.startOdometerInKms;
+      }
+
+      await activeSession.save();
+    }
+
     return log;
   }
 
   async findAll(filters: any) {
-    const query: any = { isDeleted: false };
+    const query: any = {};
 
     if (filters.vehicleId) {
       this.validateObjectId(filters.vehicleId, 'vehicleId');
@@ -111,7 +158,6 @@ export class KmLogsService {
 
     const log = await this.kmLogModel.findOne({
       _id: new Types.ObjectId(logId),
-      isDeleted: false,
     });
 
     if (!log) throw new NotFoundException('KM Log not found');
@@ -123,7 +169,7 @@ export class KmLogsService {
     this.validateObjectId(logId, 'logId');
 
     const existing = await this.kmLogModel.findById(logId);
-    if (!existing || existing.isDeleted) {
+    if (!existing) {
       throw new NotFoundException('KM Log not found');
     }
 
@@ -152,14 +198,11 @@ export class KmLogsService {
   async remove(logId: string) {
     this.validateObjectId(logId, 'logId');
 
-    const log = await this.kmLogModel.findById(logId);
-    if (!log || log.isDeleted) {
+    const deleted = await this.kmLogModel.findByIdAndDelete(logId).exec();
+
+    if (!deleted) {
       throw new NotFoundException('KM Log not found');
     }
-
-    await this.kmLogModel.findByIdAndUpdate(logId, {
-      $set: { isDeleted: true },
-    });
 
     return { message: 'KM Log deleted successfully' };
   }

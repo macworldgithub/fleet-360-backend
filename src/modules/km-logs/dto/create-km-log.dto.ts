@@ -63,4 +63,9 @@ export class CreateKmLogDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 'Meeting with client at their office' })
+  @IsOptional()
+  @IsString()
+  businessPurpose?: string;
 }
