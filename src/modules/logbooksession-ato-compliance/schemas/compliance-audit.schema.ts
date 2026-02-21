@@ -3,27 +3,18 @@ import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type ComplianceAuditDocument = ComplianceAudit & Document;
 
-export enum AuditEntityType {
-  KM_LOG = 'KM_LOG',
-  LOGBOOK_SESSION = 'LOGBOOK_SESSION',
-}
-
 export enum AuditAction {
   CREATE = 'CREATE',
-  UPDATE = 'UPDATE',
   LOCK = 'LOCK',
 }
 
-
 @Schema({ timestamps: true })
 export class ComplianceAudit {
-  /** The _id of the entity being audited */
+  /** The LogbookSession _id being audited */
   @Prop({ type: Types.ObjectId, required: true, index: true })
-  entityId: Types.ObjectId;
+  sessionId: Types.ObjectId;
 
-  @Prop({ enum: AuditEntityType, required: true })
-  entityType: AuditEntityType;
-
+  /** What happened */
   @Prop({ enum: AuditAction, required: true })
   action: AuditAction;
 
@@ -31,11 +22,11 @@ export class ComplianceAudit {
   @Prop({ type: Types.ObjectId, required: true })
   performedBy: Types.ObjectId;
 
-  /** Snapshot of the entity before the change (null for CREATE) */
+  /** Snapshot before change (null for CREATE) */
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   previousValue: Record<string, any> | null;
 
-  /** Snapshot of the entity after the change */
+  /** Snapshot after change */
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   newValue: Record<string, any> | null;
 }
@@ -43,4 +34,5 @@ export class ComplianceAudit {
 export const ComplianceAuditSchema =
   SchemaFactory.createForClass(ComplianceAudit);
 
-ComplianceAuditSchema.index({ entityType: 1, action: 1 });
+/** Helpful index for fetching session history quickly */
+ComplianceAuditSchema.index({ sessionId: 1, createdAt: -1 });

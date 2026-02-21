@@ -15,7 +15,6 @@ import {
 import {
   ComplianceAudit,
   ComplianceAuditDocument,
-  AuditEntityType,
   AuditAction,
 } from './schemas/compliance-audit.schema';
 import { KmLog, KmLogDocument, TripType } from '../km-logs/schemas/km-log.schema';
@@ -140,8 +139,7 @@ export class LogbookSessionAtoComplianceService {
       await this.auditModel.create(
         [
           {
-            entityId: session._id,
-            entityType: AuditEntityType.LOGBOOK_SESSION,
+            sessionId: session._id,
             action: AuditAction.CREATE,
             performedBy: performedByOid,
             previousValue: null,
@@ -174,7 +172,7 @@ export class LogbookSessionAtoComplianceService {
     }
 
     if (session.isLocked) {
-      throw new ConflictException('This logbook session is already locked.');
+      throw new BadRequestException('This logbook session is already locked.');
     }
 
     // When locking, we finalize the endDate if it was live
@@ -201,32 +199,31 @@ export class LogbookSessionAtoComplianceService {
       );
     }
 
-    const previousValue = session.toObject();
+    const oldStatus = session.status;
     const userOid = new Types.ObjectId(userId);
 
     const transactionSession = await this.connection.startSession();
     transactionSession.startTransaction();
 
     try {
-      session.isLocked = true;
       session.status = LogbookSessionStatus.LOCKED;
+      session.isLocked = true;
       session.lockedAt = new Date();
       session.lockedBy = userOid;
-      
+
       // ATO validity check at the moment of locking
       session.isValidForFbt = session.minimumPeriodSatisfied && session.businessKms > 0;
-      
+
       await session.save({ session: transactionSession });
 
       await this.auditModel.create(
         [
           {
-            entityId: session._id,
-            entityType: AuditEntityType.LOGBOOK_SESSION,
+            sessionId: session._id,
             action: AuditAction.LOCK,
             performedBy: userOid,
-            previousValue,
-            newValue: session.toObject(),
+            previousValue: { status: oldStatus },
+            newValue: { status: LogbookSessionStatus.LOCKED },
           },
         ],
         { session: transactionSession },
@@ -295,6 +292,18 @@ export class LogbookSessionAtoComplianceService {
     return this.sessionModel
       .find({ vehicleId: new Types.ObjectId(vehicleId) })
       .sort({ startDate: -1 })
+      .lean()
+      .exec();
+  }
+
+  // ─── getAuditsBySession ───────────────────────────────────────────────
+
+  async getAuditsBySession(sessionId: string) {
+    this.validateObjectId(sessionId, 'sessionId');
+
+    return this.auditModel
+      .find({ sessionId: new Types.ObjectId(sessionId) })
+      .sort({ createdAt: -1 })
       .lean()
       .exec();
   }

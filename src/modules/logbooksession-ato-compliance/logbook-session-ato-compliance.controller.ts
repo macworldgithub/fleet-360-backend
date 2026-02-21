@@ -54,6 +54,16 @@ export class LogbookSessionAtoComplianceController {
     return this.service.lockLogbookSession(id, dto.userId);
   }
 
+  @Get(':id/audits')
+  @ApiOperation({
+    summary: 'Get audit trail for a logbook session',
+    description: 'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
+  })
+  @ApiParam({ name: 'id', description: 'Logbook Session ID' })
+  getAudits(@Param('id') id: string) {
+    return this.service.getAuditsBySession(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get logbook session by ID' })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
