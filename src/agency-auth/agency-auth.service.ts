@@ -77,6 +77,10 @@ export class AgencyAuthService {
       throw new ForbiddenException('Agency is inactive');
     }
 
+    if (agency.role !== dto.role) {
+      throw new UnauthorizedException('Role mismatch. You are not authorized for this role.');
+    }
+
     const accessToken = await this.signAccessToken(
       agency._id.toString(),
       agency.contactEmail,
