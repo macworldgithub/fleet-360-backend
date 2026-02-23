@@ -11,7 +11,7 @@ export class Driver {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
   @Prop({ required: true, trim: true })
@@ -26,6 +26,5 @@ export class Driver {
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
 
-DriverSchema.index({ agencyId: 1 });
 DriverSchema.index({ email: 1 });
 DriverSchema.index({ driverLicenseNumber: 1 });

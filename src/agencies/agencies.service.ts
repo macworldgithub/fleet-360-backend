@@ -18,7 +18,10 @@ export class AgenciesService {
   }
 
   findByName(agencyName: string) {
-    return this.agencyModel.findOne({ agencyName }).exec();
+    const trimmedName = agencyName.trim();
+    return this.agencyModel
+      .findOne({ agencyName: { $regex: new RegExp(`^${trimmedName}$`, 'i') } })
+      .exec();
   }
 
   findAll() {

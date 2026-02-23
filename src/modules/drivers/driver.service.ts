@@ -25,6 +25,12 @@ export class DriverService {
   // DRIVER MANAGEMENT
   // =========================
 
+  findByEmail(email: string): Promise<DriverDocument | null> {
+    return this.driverModel
+      .findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } })
+      .exec();
+  }
+
   async create(
     data: {
       name: string;
@@ -167,6 +173,7 @@ export class DriverService {
         { $set: { assignedVehicle: null } },
         { new: true },
       )
+      .populate('assignedVehicle')
       .exec();
 
     if (!driver) {

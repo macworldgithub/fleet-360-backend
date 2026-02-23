@@ -25,9 +25,9 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  private async signAccessToken(userId: string, email: string) {
+  private async signAccessToken(userId: string, email: string, role: string, agencyId?: string) {
     return this.jwtService.signAsync(
-      { sub: userId, email },
+      { sub: userId, email, role, agencyId, type: 'USER' },
       {
         secret: this.configService.get('JWT_ACCESS_SECRET'),
         expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
@@ -35,9 +35,9 @@ export class AuthService {
     );
   }
 
-  private async signRefreshToken(userId: string, email: string) {
+  private async signRefreshToken(userId: string, email: string, role: string, agencyId?: string) {
     return this.jwtService.signAsync(
-      { sub: userId, email },
+      { sub: userId, email, role, agencyId, type: 'USER' },
       {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
@@ -95,8 +95,9 @@ export class AuthService {
     });
 
     // ── Automatic driver record creation ──
+    let driverData;
     if (dto.role === UserRole.DRIVER && resolvedAgencyId) {
-      await this.driverService.create(
+      const driver = await this.driverService.create(
         {
           name: dto.fullName,
           email: dto.email,
@@ -105,11 +106,14 @@ export class AuthService {
         },
         resolvedAgencyId,
       );
+      driverData = driver;
     }
 
     return {
       message: 'User registered successfully. Please verify your email.',
-      userId: user._id,
+      userId: user._id.toString(),
+      driverId: driverData ? driverData._id.toString() : null,
+      driver: driverData ?? null,
       emailVerificationToken: verificationToken, // remove this in production
     };
   }
@@ -129,13 +133,23 @@ export class AuthService {
       throw new ForbiddenException('Email is not verified');
     }
 
+    let resolvedAgencyId: string | undefined;
+    if (user.role === UserRole.DRIVER) {
+      const driver = await this.driverService.findByEmail(user.email);
+      resolvedAgencyId = driver?.agencyId?.toString();
+    }
+
     const accessToken = await this.signAccessToken(
       user._id.toString(),
       user.email,
+      user.role,
+      resolvedAgencyId,
     );
     const refreshToken = await this.signRefreshToken(
       user._id.toString(),
       user.email,
+      user.role,
+      resolvedAgencyId,
     );
 
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
@@ -190,13 +204,23 @@ export class AuthService {
     const match = await bcrypt.compare(refreshToken, user.refreshTokenHash);
     if (!match) throw new UnauthorizedException('Refresh token not valid');
 
+    let resolvedAgencyId: string | undefined;
+    if (user.role === UserRole.DRIVER) {
+      const driver = await this.driverService.findByEmail(user.email);
+      resolvedAgencyId = driver?.agencyId?.toString();
+    }
+
     const newAccessToken = await this.signAccessToken(
       user._id.toString(),
       user.email,
+      user.role,
+      resolvedAgencyId,
     );
     const newRefreshToken = await this.signRefreshToken(
       user._id.toString(),
       user.email,
+      user.role,
+      resolvedAgencyId,
     );
 
     await this.usersService.updateById(user._id.toString(), {

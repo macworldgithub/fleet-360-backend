@@ -10,6 +10,7 @@ import {
   Req,
   Post,
   Body,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverService } from './driver.service';
@@ -29,6 +30,9 @@ export class DriverController {
   @ApiOperation({ summary: 'Get all drivers for the agency' })
   findAll(@Req() req) {
     const agencyId = req.user.agencyId;
+    if (!agencyId) {
+      throw new ForbiddenException('User is not associated with any agency');
+    }
     return this.driverService.findAll(agencyId);
   }
 
@@ -36,6 +40,9 @@ export class DriverController {
   @ApiOperation({ summary: 'Get a driver by ID' })
   findOne(@Req() req, @Param('driverId') driverId: string) {
     const agencyId = req.user.agencyId;
+    if (!agencyId) {
+      throw new ForbiddenException('User is not associated with any agency');
+    }
     return this.driverService.findOne(driverId, agencyId);
   }
 
