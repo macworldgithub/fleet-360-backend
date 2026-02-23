@@ -19,9 +19,9 @@ export class AgencyAuthService {
     private configService: ConfigService,
   ) {}
 
-  private async signAccessToken(agencyId: string, email: string) {
+  private async signAccessToken(agencyId: string, email: string, role: string) {
     return this.jwtService.signAsync(
-      { sub: agencyId, email, type: 'AGENCY' },
+      { sub: agencyId, email, role, type: 'AGENCY' },
       {
         secret: this.configService.get('JWT_ACCESS_SECRET'),
         expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
@@ -29,9 +29,9 @@ export class AgencyAuthService {
     );
   }
 
-  private async signRefreshToken(agencyId: string, email: string) {
+  private async signRefreshToken(agencyId: string, email: string, role: string) {
     return this.jwtService.signAsync(
-      { sub: agencyId, email, type: 'AGENCY' },
+      { sub: agencyId, email, role, type: 'AGENCY' },
       {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
@@ -56,6 +56,7 @@ export class AgencyAuthService {
       state: dto.state ?? undefined,
       city: dto.city ?? undefined,
       passwordHash,
+      role: dto.role,
       isEmailVerified: true,
     });
 
@@ -79,11 +80,13 @@ export class AgencyAuthService {
     const accessToken = await this.signAccessToken(
       agency._id.toString(),
       agency.contactEmail,
+      agency.role,
     );
 
     const refreshToken = await this.signRefreshToken(
       agency._id.toString(),
       agency.contactEmail,
+      agency.role,
     );
 
     await this.agenciesService.updateById(agency._id.toString(), {
@@ -97,6 +100,7 @@ export class AgencyAuthService {
         id: agency._id,
         agencyName: agency.agencyName,
         contactEmail: agency.contactEmail,
+        role: agency.role,
         subscriptionTier: agency.subscriptionTier,
       },
     };

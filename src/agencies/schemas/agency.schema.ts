@@ -9,6 +9,11 @@ export enum SubscriptionTier {
   PARTNER = 'PARTNER',
 }
 
+export enum AgencyRole {
+  PRINCIPAL = 'PRINCIPAL',
+  FLEET_MANAGER = 'FLEET_MANAGER',
+}
+
 @Schema({ timestamps: true })
 export class Agency {
   @Prop({ required: true })
@@ -44,6 +49,13 @@ export class Agency {
     default: SubscriptionTier.ESSENTIAL,
   })
   subscriptionTier: SubscriptionTier;
+
+  @Prop({
+    type: String,
+    enum: AgencyRole,
+    default: AgencyRole.FLEET_MANAGER,
+  })
+  role: AgencyRole;
 
   @Prop({ type: Boolean, default: true })
   isActive: boolean;
