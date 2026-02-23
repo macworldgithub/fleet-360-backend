@@ -6,7 +6,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { RegisterDto } from './dto/register.dto';
+import { DriverService } from '../modules/drivers/driver.service';
+import { AgenciesService } from '../agencies/agencies.service';
+import { RegisterDto, UserRole } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +19,8 @@ import { hashToken, generateToken } from '../common/utils/crypto.util';
 export class AuthService {
   constructor(
     private usersService: UsersService,
+    private driverService: DriverService,
+    private agenciesService: AgenciesService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -45,6 +49,36 @@ export class AuthService {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already registered');
 
+    let resolvedAgencyId: string | undefined;
+
+    // ── Role-specific validation ──
+    if (dto.role === UserRole.DRIVER) {
+      if (!dto.driverLicenseNumber) {
+        throw new BadRequestException(
+          'driverLicenseNumber is required for DRIVER role.',
+        );
+      }
+      if (!dto.agencyName) {
+        throw new BadRequestException('agencyName is required for DRIVER role.');
+      }
+
+      const agency = await this.agenciesService.findByName(dto.agencyName);
+      if (!agency) {
+        throw new BadRequestException(
+          `Agency with name "${dto.agencyName}" not found.`,
+        );
+      }
+      resolvedAgencyId = agency._id.toString();
+    }
+
+    if (dto.role === UserRole.PASSENGER) {
+      if (dto.driverLicenseNumber) {
+        throw new BadRequestException(
+          'driverLicenseNumber is not allowed for PASSENGER role.',
+        );
+      }
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const verificationToken = generateToken();
@@ -60,8 +94,18 @@ export class AuthService {
       emailVerificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
     });
 
-    // TODO: send email using email service
-    // verification link: FRONTEND_URL/verify-email?token=verificationToken
+    // ── Automatic driver record creation ──
+    if (dto.role === UserRole.DRIVER && resolvedAgencyId) {
+      await this.driverService.create(
+        {
+          name: dto.fullName,
+          email: dto.email,
+          phoneNumber: dto.phoneNumber!,
+          driverLicenseNumber: dto.driverLicenseNumber!,
+        },
+        resolvedAgencyId,
+      );
+    }
 
     return {
       message: 'User registered successfully. Please verify your email.',
@@ -76,6 +120,10 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    if (user.role !== dto.role) {
+      throw new UnauthorizedException('Role mismatch. You are not authorized for this role.');
+    }
 
     if (!user.isEmailVerified) {
       throw new ForbiddenException('Email is not verified');

@@ -1,8 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
   Patch,
   Param,
   Delete,
@@ -10,10 +8,11 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  Post,
+  Body,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverService } from './driver.service';
-import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
@@ -25,14 +24,6 @@ export class DriverController {
   constructor(private readonly driverService: DriverService) {}
 
   // DRIVER MANAGEMENT APIs
-
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new driver' })
-  create(@Req() req, @Body() createDriverDto: CreateDriverDto) {
-    const agencyId = req.user.agencyId;
-    return this.driverService.create(createDriverDto, agencyId);
-  }
 
   @Get()
   @ApiOperation({ summary: 'Get all drivers for the agency' })

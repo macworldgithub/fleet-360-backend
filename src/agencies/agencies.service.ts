@@ -17,6 +17,10 @@ export class AgenciesService {
     return this.agencyModel.findOne({ contactEmail }).exec();
   }
 
+  findByName(agencyName: string) {
+    return this.agencyModel.findOne({ agencyName }).exec();
+  }
+
   findAll() {
     return this.agencyModel.find().exec();
   }

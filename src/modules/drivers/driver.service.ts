@@ -6,7 +6,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Driver, DriverDocument } from './schemas/driver.schema';
-import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 
 @Injectable()
@@ -27,13 +26,18 @@ export class DriverService {
   // =========================
 
   async create(
-    createDriverDto: CreateDriverDto,
+    data: {
+      name: string;
+      email: string;
+      phoneNumber: string;
+      driverLicenseNumber: string;
+    },
     agencyId: string,
   ): Promise<DriverDocument> {
     this.validateObjectId(agencyId, 'agencyId');
 
     const driver = new this.driverModel({
-      ...createDriverDto,
+      ...data,
       agencyId: new Types.ObjectId(agencyId),
     });
 
