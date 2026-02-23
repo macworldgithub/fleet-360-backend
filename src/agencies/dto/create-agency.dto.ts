@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
-import { SubscriptionTier } from '../schemas/agency.schema';
+import { SubscriptionTier, AgencyRole } from '../schemas/agency.schema';
 
 export class CreateAgencyDto {
   @ApiProperty({ example: 'Fleet Masters Pty Ltd' })
@@ -51,4 +51,13 @@ export class CreateAgencyDto {
   @IsOptional()
   @IsEnum(SubscriptionTier)
   subscriptionTier?: SubscriptionTier;
+
+  @ApiPropertyOptional({
+    enum: AgencyRole,
+    example: AgencyRole.FLEET_MANAGER,
+    description: 'Role of the agency user (PRINCIPAL or FLEET_MANAGER)',
+  })
+  @IsOptional()
+  @IsEnum(AgencyRole)
+  role?: AgencyRole;
 }
