@@ -10,6 +10,7 @@ import { OfficesModule } from './offices/dto/offices.module';
 import { DriverModule } from './modules/drivers/driver.module';
 import { KmLogsModule } from './modules/km-logs/km-logs.module';
 import { LogbookSessionAtoComplianceModule } from './modules/logbooksession-ato-compliance/logbook-session-ato-compliance.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { LogbookSessionAtoComplianceModule } from './modules/logbooksession-ato-
     DriverModule,
     KmLogsModule,
     LogbookSessionAtoComplianceModule,
+    MaintenanceModule,
   ],
 })
 export class AppModule {}

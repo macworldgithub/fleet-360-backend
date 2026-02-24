@@ -96,39 +96,27 @@ export class VehicleService {
     return vehicle;
   }
 
-  async activate(vehicleId: string): Promise<VehicleDocument> {
+  async toggleStatus(vehicleId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
-    const vehicle = await this.vehicleModel
-      .findOneAndUpdate(
-        { _id: new Types.ObjectId(vehicleId) },
-        { $set: { vehicleStatus: VehicleStatus.ACTIVATE } },
-        { new: true },
-      )
-      .exec();
+    const vehicle = await this.vehicleModel.findById(vehicleId).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
-    return vehicle;
-  }
-
-  async deactivate(vehicleId: string): Promise<VehicleDocument> {
-    this.validateObjectId(vehicleId, 'Vehicle ID');
-
-    const vehicle = await this.vehicleModel
-      .findOneAndUpdate(
-        { _id: new Types.ObjectId(vehicleId) },
-        { $set: { vehicleStatus: VehicleStatus.DEACTIVATE } },
-        { new: true },
-      )
-      .exec();
-
-    if (!vehicle) {
-      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
+    if (vehicle.vehicleStatus === VehicleStatus.IN_MAINTENANCE) {
+      throw new BadRequestException(
+        'Cannot toggle status while vehicle is IN_MAINTENANCE',
+      );
     }
 
-    return vehicle;
+    const newStatus =
+      vehicle.vehicleStatus === VehicleStatus.ACTIVATE
+        ? VehicleStatus.DEACTIVATE
+        : VehicleStatus.ACTIVATE;
+
+    vehicle.vehicleStatus = newStatus;
+    return vehicle.save();
   }
 }

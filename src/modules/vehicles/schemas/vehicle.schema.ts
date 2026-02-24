@@ -13,6 +13,7 @@ export enum FuelType {
 export enum VehicleStatus {
   ACTIVATE = 'ACTIVATE',
   DEACTIVATE = 'DEACTIVATE',
+  IN_MAINTENANCE = 'IN_MAINTENANCE',
 }
 
 export enum LeaseType {

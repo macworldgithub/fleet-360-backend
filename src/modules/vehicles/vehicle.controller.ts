@@ -59,15 +59,9 @@ export class VehicleController {
     return this.vehicleService.remove(vehicleId);
   }
 
-  @Patch(':vehicleId/activate')
-  @ApiOperation({ summary: 'Activate a vehicle' })
-  activate(@Param('vehicleId') vehicleId: string) {
-    return this.vehicleService.activate(vehicleId);
-  }
-
-  @Patch(':vehicleId/deactivate')
-  @ApiOperation({ summary: 'Deactivate a vehicle' })
-  deactivate(@Param('vehicleId') vehicleId: string) {
-    return this.vehicleService.deactivate(vehicleId);
+  @Patch(':vehicleId/toggle-status')
+  @ApiOperation({ summary: 'Toggle vehicle status between ACTIVATE and DEACTIVATE' })
+  toggleStatus(@Param('vehicleId') vehicleId: string) {
+    return this.vehicleService.toggleStatus(vehicleId);
   }
 }
