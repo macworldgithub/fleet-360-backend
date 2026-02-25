@@ -11,6 +11,7 @@ import { DriverModule } from './modules/drivers/driver.module';
 import { KmLogsModule } from './modules/km-logs/km-logs.module';
 import { LogbookSessionAtoComplianceModule } from './modules/logbooksession-ato-compliance/logbook-session-ato-compliance.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
+import { IncidentModule } from './modules/incidents/incident.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
     KmLogsModule,
     LogbookSessionAtoComplianceModule,
     MaintenanceModule,
+    IncidentModule,
   ],
 })
 export class AppModule {}
