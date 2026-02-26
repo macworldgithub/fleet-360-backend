@@ -23,7 +23,7 @@ export class IncidentService {
     agencyId: string,
     vehicleId: string,
     dto: CreateIncidentDto,
-    photos: Express.Multer.File[],
+    photos: any[],
   ) {
     if (!Types.ObjectId.isValid(agencyId))
       throw new BadRequestException('Invalid agencyId');

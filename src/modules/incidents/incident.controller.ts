@@ -40,7 +40,7 @@ export class IncidentController {
     @Query('agencyId') agencyId: string,
     @Query('vehicleId') vehicleId: string,
     @Body() dto: CreateIncidentDto,
-    @UploadedFiles() photos: Express.Multer.File[],
+    @UploadedFiles() photos: any[],
   ) {
     return this.incidentService.create(agencyId, vehicleId, dto, photos);
   }
