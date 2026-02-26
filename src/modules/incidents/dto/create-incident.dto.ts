@@ -8,7 +8,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IncidentType } from '../schemas/incident.schema';
+import { IncidentType, IncidentStatus } from '../schemas/incident.schema';
 
 export class CreateIncidentDto {
   @ApiProperty({ enum: IncidentType })
@@ -48,4 +48,9 @@ export class CreateIncidentDto {
   @IsOptional()
   @IsString()
   policeReportNumber?: string;
+
+  @ApiPropertyOptional({ enum: IncidentStatus })
+  @IsOptional()
+  @IsEnum(IncidentStatus)
+  status?: IncidentStatus;
 }

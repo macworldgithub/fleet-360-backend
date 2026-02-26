@@ -8,8 +8,6 @@ import {
   Body,
   Query,
   UseGuards,
-  UploadedFiles,
-  UseInterceptors,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -17,9 +15,8 @@ import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
 } from '@nestjs/swagger';
-import { FilesInterceptor } from '@nestjs/platform-express';
+// import { FilesInterceptor } from '@nestjs/platform-express'; 
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { IncidentService } from './incident.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
@@ -34,15 +31,15 @@ export class IncidentController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FilesInterceptor('photos', 5))
-  @ApiOperation({ summary: 'Create Incident (with photo upload)' })
+  // @UseInterceptors(FilesInterceptor('photos', 5)) 
+  @ApiOperation({ summary: 'Create Incident' })
   create(
     @Query('agencyId') agencyId: string,
     @Query('vehicleId') vehicleId: string,
     @Body() dto: CreateIncidentDto,
-    @UploadedFiles() photos: any[],
+    // @UploadedFiles() photos: any[], 
   ) {
-    return this.incidentService.create(agencyId, vehicleId, dto, photos);
+    return this.incidentService.create(agencyId, vehicleId, dto);
   }
 
   @Get()

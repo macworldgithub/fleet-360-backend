@@ -23,7 +23,7 @@ export class IncidentService {
     agencyId: string,
     vehicleId: string,
     dto: CreateIncidentDto,
-    photos: any[],
+    // photos: any[],
   ) {
     if (!Types.ObjectId.isValid(agencyId))
       throw new BadRequestException('Invalid agencyId');
@@ -31,7 +31,7 @@ export class IncidentService {
     if (!Types.ObjectId.isValid(vehicleId))
       throw new BadRequestException('Invalid vehicleId');
 
-    const photoPaths = photos?.map((file) => file.path) || [];
+    // const photoPaths = photos?.map((file) => file.path) || [];
 
     return this.incidentModel.create({
       agencyId: new Types.ObjectId(agencyId),
@@ -44,7 +44,7 @@ export class IncidentService {
       estimatedRepairCost: dto.estimatedRepairCost ?? null,
       insuranceClaimFiled: dto.insuranceClaimFiled ?? false,
       policeReportNumber: dto.policeReportNumber ?? null,
-      evidencePhotos: photoPaths,
+      // evidencePhotos: dto.evidencePhotos ?? [], 
       isDeleted: false,
     });
   }

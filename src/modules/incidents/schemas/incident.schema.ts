@@ -52,8 +52,8 @@ export class Incident {
   @Prop({ type: String, default: null })
   policeReportNumber?: string | null;
 
-  @Prop({ type: [String], default: [] })
-  evidencePhotos: string[];
+  // @Prop({ type: [String], default: [] })
+  // evidencePhotos: string[];
 
   @Prop({ enum: IncidentStatus, default: IncidentStatus.REPORTED })
   status: IncidentStatus;
