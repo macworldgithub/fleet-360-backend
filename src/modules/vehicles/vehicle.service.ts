@@ -26,31 +26,38 @@ export class VehicleService {
     }
   }
 
-  async create(createVehicleDto: CreateVehicleDto): Promise<VehicleDocument> {
-    const vehicle = new this.vehicleModel(createVehicleDto);
+  async create(
+    createVehicleDto: CreateVehicleDto,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
+    const vehicle = new this.vehicleModel({
+      ...createVehicleDto,
+      agencyId: new Types.ObjectId(agencyId),
+    });
     return vehicle.save();
   }
 
-  async findAll(officeId?: string): Promise<VehicleDocument[]> {
-    const filter: any = {};
+  async findAll(
+    agencyId: string,
+    officeId?: string,
+  ): Promise<VehicleDocument[]> {
+    const filter: any = { agencyId: new Types.ObjectId(agencyId) };
 
     if (officeId) {
       this.validateObjectId(officeId, 'officeId');
       filter.officeId = new Types.ObjectId(officeId);
     }
 
-    return this.vehicleModel
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .exec();
+    return this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
   }
 
-  async findOne(vehicleId: string): Promise<VehicleDocument> {
+  async findOne(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const vehicle = await this.vehicleModel
       .findOne({
         _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
       })
       .exec();
 
@@ -64,12 +71,16 @@ export class VehicleService {
   async update(
     vehicleId: string,
     updateVehicleDto: UpdateVehicleDto,
+    agencyId: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        { _id: new Types.ObjectId(vehicleId) },
+        {
+          _id: new Types.ObjectId(vehicleId),
+          agencyId: new Types.ObjectId(agencyId),
+        },
         { $set: updateVehicleDto },
         { new: true },
       )
@@ -82,11 +93,14 @@ export class VehicleService {
     return vehicle;
   }
 
-  async remove(vehicleId: string): Promise<VehicleDocument> {
+  async remove(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const vehicle = await this.vehicleModel
-      .findOneAndDelete({ _id: new Types.ObjectId(vehicleId) })
+      .findOneAndDelete({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .exec();
 
     if (!vehicle) {
@@ -96,10 +110,18 @@ export class VehicleService {
     return vehicle;
   }
 
-  async toggleStatus(vehicleId: string): Promise<VehicleDocument> {
+  async toggleStatus(
+    vehicleId: string,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
-    const vehicle = await this.vehicleModel.findById(vehicleId).exec();
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);

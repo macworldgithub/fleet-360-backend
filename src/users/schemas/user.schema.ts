@@ -14,11 +14,11 @@ export class User {
   @Prop({ required: true })
   passwordHash: string;
 
-  // Role 
-  @Prop({ 
-    required: true, 
+  // Role
+  @Prop({
+    required: true,
     enum: ['PASSENGER', 'DRIVER'],
-    default: 'DRIVER'
+    default: 'DRIVER',
   })
   role: string;
 

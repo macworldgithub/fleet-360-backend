@@ -17,7 +17,11 @@ import {
   ComplianceAuditDocument,
   AuditAction,
 } from './schemas/compliance-audit.schema';
-import { KmLog, KmLogDocument, TripType } from '../km-logs/schemas/km-log.schema';
+import {
+  KmLog,
+  KmLogDocument,
+  TripType,
+} from '../km-logs/schemas/km-log.schema';
 import { CreateLogbookSessionDto } from './dto/create-logbook-session.dto';
 
 /** ATO minimum continuous logbook period: 12 weeks = 84 days */
@@ -77,7 +81,10 @@ export class LogbookSessionAtoComplianceService {
         // Existing session that is still open (no endDate)
         { endDate: null },
         // Existing session that overlaps with the new range
-        { startDate: { $lte: endDate || new Date() }, endDate: { $gte: startDate } },
+        {
+          startDate: { $lte: endDate || new Date() },
+          endDate: { $gte: startDate },
+        },
       ],
     };
 
@@ -87,7 +94,10 @@ export class LogbookSessionAtoComplianceService {
       overlappingQuery.endDate = null;
     }
 
-    const overlapping = await this.sessionModel.findOne(overlappingQuery).lean().exec();
+    const overlapping = await this.sessionModel
+      .findOne(overlappingQuery)
+      .lean()
+      .exec();
 
     if (overlapping) {
       throw new ConflictException(
@@ -212,7 +222,8 @@ export class LogbookSessionAtoComplianceService {
       session.lockedBy = userOid;
 
       // ATO validity check at the moment of locking
-      session.isValidForFbt = session.minimumPeriodSatisfied && session.businessKms > 0;
+      session.isValidForFbt =
+        session.minimumPeriodSatisfied && session.businessKms > 0;
 
       await session.save({ session: transactionSession });
 
@@ -251,7 +262,9 @@ export class LogbookSessionAtoComplianceService {
       .exec();
 
     if (!session) {
-      throw new NotFoundException('No active logbook session found for this vehicle.');
+      throw new NotFoundException(
+        'No active logbook session found for this vehicle.',
+      );
     }
 
     const trips = await this.kmLogModel
@@ -272,10 +285,7 @@ export class LogbookSessionAtoComplianceService {
   async getSessionById(sessionId: string) {
     this.validateObjectId(sessionId, 'sessionId');
 
-    const session = await this.sessionModel
-      .findById(sessionId)
-      .lean()
-      .exec();
+    const session = await this.sessionModel.findById(sessionId).lean().exec();
 
     if (!session) {
       throw new NotFoundException('Logbook session not found.');

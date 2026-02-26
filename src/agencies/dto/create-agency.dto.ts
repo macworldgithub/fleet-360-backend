@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEnum,
+} from 'class-validator';
 import { SubscriptionTier, AgencyRole } from '../schemas/agency.schema';
 
 export class CreateAgencyDto {
@@ -47,7 +53,10 @@ export class CreateAgencyDto {
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional({ enum: SubscriptionTier, example: SubscriptionTier.ESSENTIAL })
+  @ApiPropertyOptional({
+    enum: SubscriptionTier,
+    example: SubscriptionTier.ESSENTIAL,
+  })
   @IsOptional()
   @IsEnum(SubscriptionTier)
   subscriptionTier?: SubscriptionTier;

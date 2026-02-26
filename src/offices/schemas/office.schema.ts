@@ -10,10 +10,10 @@ export class Office {
 
   @Prop({ required: true })
   officeName: string;
-  
+
   @Prop({ required: true })
   officeType: string;
-  
+
   @Prop({ required: true })
   officeHours: string;
 

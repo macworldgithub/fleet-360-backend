@@ -24,9 +24,7 @@ import { LockLogbookSessionDto } from './dto/lock-logbook-session.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('api/logbook-sessions')
 export class LogbookSessionAtoComplianceController {
-  constructor(
-    private readonly service: LogbookSessionAtoComplianceService,
-  ) {}
+  constructor(private readonly service: LogbookSessionAtoComplianceService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -57,7 +55,8 @@ export class LogbookSessionAtoComplianceController {
   @Get(':id/audits')
   @ApiOperation({
     summary: 'Get audit trail for a logbook session',
-    description: 'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
+    description:
+      'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
   })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
   getAudits(@Param('id') id: string) {
@@ -74,7 +73,8 @@ export class LogbookSessionAtoComplianceController {
   @Get('live/:vehicleId')
   @ApiOperation({
     summary: 'Get live logbook summary for a vehicle',
-    description: 'Returns the current active (unlocked) session with real-time totals and trip list.',
+    description:
+      'Returns the current active (unlocked) session with real-time totals and trip list.',
   })
   @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
   getLiveSummary(@Param('vehicleId') vehicleId: string) {

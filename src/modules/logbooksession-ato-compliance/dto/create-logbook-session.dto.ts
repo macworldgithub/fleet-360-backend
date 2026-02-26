@@ -32,7 +32,8 @@ export class CreateLogbookSessionDto {
 
   @ApiProperty({
     example: '2025-06-30',
-    description: 'End date of the logbook period (inclusive). Optional for live sessions.',
+    description:
+      'End date of the logbook period (inclusive). Optional for live sessions.',
     required: false,
   })
   @IsDateString()

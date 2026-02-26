@@ -77,10 +77,7 @@ export class MaintenanceService {
 
   // ===================== SUBMIT =====================
 
-  async submit(
-    id: string,
-    userId: string,
-  ): Promise<MaintenanceDocument> {
+  async submit(id: string, userId: string): Promise<MaintenanceDocument> {
     this.validateObjectId(id, 'Maintenance ID');
 
     const maintenance = await this.maintenanceModel.findById(id).exec();
@@ -90,7 +87,9 @@ export class MaintenanceService {
 
     // Only the creator can submit
     if (maintenance.createdBy.toString() !== userId) {
-      throw new ForbiddenException('Only the creator can submit this maintenance request');
+      throw new ForbiddenException(
+        'Only the creator can submit this maintenance request',
+      );
     }
 
     // Only DRAFT can move to SUBMITTED

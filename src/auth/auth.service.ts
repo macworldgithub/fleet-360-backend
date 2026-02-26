@@ -25,7 +25,12 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  private async signAccessToken(userId: string, email: string, role: string, agencyId?: string) {
+  private async signAccessToken(
+    userId: string,
+    email: string,
+    role: string,
+    agencyId?: string,
+  ) {
     return this.jwtService.signAsync(
       { sub: userId, email, role, agencyId, type: 'USER' },
       {
@@ -35,7 +40,12 @@ export class AuthService {
     );
   }
 
-  private async signRefreshToken(userId: string, email: string, role: string, agencyId?: string) {
+  private async signRefreshToken(
+    userId: string,
+    email: string,
+    role: string,
+    agencyId?: string,
+  ) {
     return this.jwtService.signAsync(
       { sub: userId, email, role, agencyId, type: 'USER' },
       {
@@ -59,7 +69,9 @@ export class AuthService {
         );
       }
       if (!dto.agencyName) {
-        throw new BadRequestException('agencyName is required for DRIVER role.');
+        throw new BadRequestException(
+          'agencyName is required for DRIVER role.',
+        );
       }
 
       const agency = await this.agenciesService.findByName(dto.agencyName);
@@ -126,7 +138,9 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
     if (user.role !== dto.role) {
-      throw new UnauthorizedException('Role mismatch. You are not authorized for this role.');
+      throw new UnauthorizedException(
+        'Role mismatch. You are not authorized for this role.',
+      );
     }
 
     if (!user.isEmailVerified) {

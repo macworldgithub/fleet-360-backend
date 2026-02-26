@@ -24,7 +24,7 @@ export enum LeaseType {
 
 @Schema({ timestamps: true })
 export class Vehicle {
-  @Prop({ type: Types.ObjectId, required: false, index: true })
+  @Prop({ type: Types.ObjectId, required: true, index: true })
   agencyId: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, required: false, index: true })

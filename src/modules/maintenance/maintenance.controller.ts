@@ -38,7 +38,9 @@ export class MaintenanceController {
   }
 
   @Patch(':id/submit')
-  @ApiOperation({ summary: 'Submit a maintenance request (creator only, DRAFT → SUBMITTED)' })
+  @ApiOperation({
+    summary: 'Submit a maintenance request (creator only, DRAFT → SUBMITTED)',
+  })
   @ApiParam({ name: 'id', description: 'Maintenance ID' })
   submit(@Req() req, @Param('id') id: string) {
     const userId = req.user.agencyId || req.user.userId;
@@ -46,7 +48,10 @@ export class MaintenanceController {
   }
 
   @Patch(':id/approve')
-  @ApiOperation({ summary: 'Approve a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → APPROVED)' })
+  @ApiOperation({
+    summary:
+      'Approve a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → APPROVED)',
+  })
   @ApiParam({ name: 'id', description: 'Maintenance ID' })
   approve(@Req() req, @Param('id') id: string) {
     const userId = req.user.agencyId || req.user.userId;
@@ -55,7 +60,10 @@ export class MaintenanceController {
   }
 
   @Patch(':id/reject')
-  @ApiOperation({ summary: 'Reject a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → REJECTED)' })
+  @ApiOperation({
+    summary:
+      'Reject a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → REJECTED)',
+  })
   @ApiParam({ name: 'id', description: 'Maintenance ID' })
   reject(@Req() req, @Param('id') id: string) {
     const userId = req.user.agencyId || req.user.userId;
@@ -64,7 +72,9 @@ export class MaintenanceController {
   }
 
   @Patch(':id/complete')
-  @ApiOperation({ summary: 'Complete a maintenance request (APPROVED → COMPLETED)' })
+  @ApiOperation({
+    summary: 'Complete a maintenance request (APPROVED → COMPLETED)',
+  })
   @ApiParam({ name: 'id', description: 'Maintenance ID' })
   complete(
     @Req() req,

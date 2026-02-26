@@ -102,7 +102,9 @@ export class KmLogsService {
       // Re-calculate business use percentage (two decimal precision)
       activeSession.businessUsePercentage =
         activeSession.totalKms > 0
-          ? Math.round((activeSession.businessKms / activeSession.totalKms) * 10000) / 100
+          ? Math.round(
+              (activeSession.businessKms / activeSession.totalKms) * 10000,
+            ) / 100
           : 0;
 
       // Update startOdometer ONLY if this is the first trip ever added to the session
