@@ -13,6 +13,7 @@ import { LogbookSessionAtoComplianceModule } from './modules/logbooksession-ato-
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { IncidentModule } from './modules/incidents/incident.module';
 import { AwsModule } from './aws/aws.module';
+import { FuelModule } from './modules/fuel/fuel.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AwsModule } from './aws/aws.module';
     LogbookSessionAtoComplianceModule,
     MaintenanceModule,
     IncidentModule,
+    FuelModule,
     AwsModule,
   ],
 })
