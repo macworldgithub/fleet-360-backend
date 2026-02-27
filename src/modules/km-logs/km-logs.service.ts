@@ -12,6 +12,7 @@ import {
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
 import { CreateKmLogDto } from './dto/create-km-log.dto';
 import { UpdateKmLogDto } from './dto/update-km-log.dto';
+import { MaintenanceService } from '../maintenance/maintenance.service';
 
 @Injectable()
 export class KmLogsService {
@@ -20,6 +21,7 @@ export class KmLogsService {
     private kmLogModel: Model<KmLogDocument>,
     @InjectModel(LogbookSession.name)
     private sessionModel: Model<LogbookSessionDocument>,
+    private readonly maintenanceService: MaintenanceService,
   ) {}
 
   private validateObjectId(id: string, label: string) {
@@ -119,6 +121,13 @@ export class KmLogsService {
 
       await activeSession.save();
     }
+
+    // ── Auto-trigger preventive maintenance check ──
+    await this.maintenanceService.autoCreateMaintenance(
+      dto.vehicleId,
+      dto.agencyId || '',
+      dto.endOdometerInKms,
+    );
 
     return log;
   }

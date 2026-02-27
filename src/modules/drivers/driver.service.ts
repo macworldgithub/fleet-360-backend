@@ -20,10 +20,7 @@ export class DriverService {
       throw new BadRequestException(`Invalid ${label}: ${id}`);
     }
   }
-
-  // =========================
   // DRIVER MANAGEMENT
-  // =========================
 
   findByEmail(email: string): Promise<DriverDocument | null> {
     return this.driverModel
@@ -121,10 +118,7 @@ export class DriverService {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
     }
   }
-
-  // =========================
   // DRIVER ASSIGNMENT
-  // =========================
 
   async assignVehicle(
     driverId: string,

@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -12,12 +14,15 @@ import {
 } from './schemas/vehicle.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { MaintenanceService } from '../maintenance/maintenance.service';
 
 @Injectable()
 export class VehicleService {
   constructor(
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
+    @Inject(forwardRef(() => MaintenanceService))
+    private readonly maintenanceService: MaintenanceService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -34,7 +39,16 @@ export class VehicleService {
       ...createVehicleDto,
       agencyId: new Types.ObjectId(agencyId),
     });
-    return vehicle.save();
+    const saved = await vehicle.save();
+
+    // Bootstrap the preventive maintenance cycle for this new vehicle
+    await this.maintenanceService.bootstrapMaintenanceCycle(
+      saved._id.toString(),
+      agencyId,
+      createVehicleDto.odometerInKms || 0,
+    );
+
+    return saved;
   }
 
   async findAll(
