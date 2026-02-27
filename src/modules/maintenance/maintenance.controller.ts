@@ -9,17 +9,20 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { CompleteMaintenanceDto } from './dtos/complete-maintenance.dto';
+import { MaintenanceStatus } from './schemas/maintenance.schema';
 
 @ApiTags('Maintenance')
 @ApiBearerAuth()
@@ -27,6 +30,23 @@ import { CompleteMaintenanceDto } from './dtos/complete-maintenance.dto';
 @Controller('api/maintenance')
 export class MaintenanceController {
   constructor(private readonly maintenanceService: MaintenanceService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Get all maintenance records (Agency context)',
+    description:
+      'Returns all maintenance records for the authenticated agency. Can be filtered by status.',
+  })
+  @ApiQuery({
+    name: 'status',
+    enum: MaintenanceStatus,
+    required: false,
+    description: 'Filter by maintenance status',
+  })
+  findAll(@Req() req, @Query('status') status?: MaintenanceStatus) {
+    const agencyId = req.user.agencyId;
+    return this.maintenanceService.findAll(agencyId, status);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)

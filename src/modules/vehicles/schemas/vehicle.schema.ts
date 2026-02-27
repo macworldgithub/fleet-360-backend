@@ -68,6 +68,33 @@ export class Vehicle {
 
   @Prop({ type: Date })
   leaseExpiryDate: Date;
+
+  @Prop({ trim: true })
+  leaseProvider: string;
+
+  @Prop({ type: Date })
+  leaseStartDate: Date;
+
+  @Prop()
+  monthlyLeasePayment: number;
+
+  @Prop()
+  leaseMileageAllowance: number;
+
+  @Prop({ trim: true })
+  leaseTerms: string;
+
+  @Prop()
+  residualValue: number;
+
+  @Prop({ trim: true })
+  externalLeaseId: string;
+
+  @Prop()
+  fbtValue: number;
+
+  @Prop()
+  depreciationRate: number;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

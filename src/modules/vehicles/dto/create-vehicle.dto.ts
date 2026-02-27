@@ -71,4 +71,49 @@ export class CreateVehicleDto {
   @IsDateString()
   @IsOptional()
   leaseExpiryDate?: string;
+
+  @ApiPropertyOptional({ example: 'LeasePlan' })
+  @IsString()
+  @IsOptional()
+  leaseProvider?: string;
+
+  @ApiPropertyOptional({ example: '2024-01-15' })
+  @IsDateString()
+  @IsOptional()
+  leaseStartDate?: string;
+
+  @ApiPropertyOptional({ example: 450.5 })
+  @IsNumber()
+  @IsOptional()
+  monthlyLeasePayment?: number;
+
+  @ApiPropertyOptional({ example: 60000 })
+  @IsNumber()
+  @IsOptional()
+  leaseMileageAllowance?: number;
+
+  @ApiPropertyOptional({ example: '36 months, 20k km/year' })
+  @IsString()
+  @IsOptional()
+  leaseTerms?: string;
+
+  @ApiPropertyOptional({ example: 15000 })
+  @IsNumber()
+  @IsOptional()
+  residualValue?: number;
+
+  @ApiPropertyOptional({ example: 'LSE-998877' })
+  @IsString()
+  @IsOptional()
+  externalLeaseId?: string;
+
+  @ApiPropertyOptional({ example: 5000 })
+  @IsNumber()
+  @IsOptional()
+  fbtValue?: number;
+
+  @ApiPropertyOptional({ example: 0.15 })
+  @IsNumber()
+  @IsOptional()
+  depreciationRate?: number;
 }

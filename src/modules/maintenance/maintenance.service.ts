@@ -402,6 +402,23 @@ export class MaintenanceService {
       .exec();
   }
 
+  async findAll(
+    agencyId: string,
+    status?: MaintenanceStatus,
+  ): Promise<MaintenanceDocument[]> {
+    const query: any = { agencyId: new Types.ObjectId(agencyId) };
+
+    if (status) {
+      query.status = status;
+    }
+
+    return this.maintenanceModel
+      .find(query)
+      .populate('vehicleId')
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
   // ===================== HELPERS =====================
 
   private assertManagerRole(role: string): void {

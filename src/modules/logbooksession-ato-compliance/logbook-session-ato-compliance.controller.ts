@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -35,8 +36,10 @@ export class LogbookSessionAtoComplianceController {
       'checks for overlapping sessions, aggregates km data from existing KmLog trips, ' +
       'and attaches the session ID to matching trips.',
   })
-  create(@Body() dto: CreateLogbookSessionDto) {
-    return this.service.createLogbookSession(dto);
+  create(@Req() req, @Body() dto: CreateLogbookSessionDto) {
+    const agencyId = req.user.agencyId;
+    const userId = req.user.userId;
+    return this.service.createLogbookSession(dto, agencyId, userId);
   }
 
   @Post(':id/lock')

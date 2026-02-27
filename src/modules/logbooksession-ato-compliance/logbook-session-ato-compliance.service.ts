@@ -58,14 +58,18 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── createLogbookSession ────────────────────────────────────────────
 
-  async createLogbookSession(dto: CreateLogbookSessionDto) {
+  async createLogbookSession(
+    dto: CreateLogbookSessionDto,
+    agencyId: string,
+    performedBy: string,
+  ) {
     this.validateObjectId(dto.vehicleId, 'vehicleId');
-    this.validateObjectId(dto.agencyId, 'agencyId');
-    this.validateObjectId(dto.performedBy, 'performedBy');
+    this.validateObjectId(agencyId, 'agencyId');
+    this.validateObjectId(performedBy, 'performedBy');
 
     const vehicleOid = new Types.ObjectId(dto.vehicleId);
-    const agencyOid = new Types.ObjectId(dto.agencyId);
-    const performedByOid = new Types.ObjectId(dto.performedBy);
+    const agencyOid = new Types.ObjectId(agencyId);
+    const performedByOid = new Types.ObjectId(performedBy);
 
     const startDate = new Date(dto.startDate);
     const endDate = dto.endDate ? new Date(dto.endDate) : null;
