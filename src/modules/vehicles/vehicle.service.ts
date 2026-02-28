@@ -12,6 +12,7 @@ import {
   VehicleDocument,
   VehicleStatus,
 } from './schemas/vehicle.schema';
+import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
@@ -21,6 +22,8 @@ export class VehicleService {
   constructor(
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
+    @InjectModel(Driver.name)
+    private driverModel: Model<DriverDocument>,
     @Inject(forwardRef(() => MaintenanceService))
     private readonly maintenanceService: MaintenanceService,
   ) {}
@@ -110,8 +113,9 @@ export class VehicleService {
   async remove(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    // 1. Find the vehicle
     const vehicle = await this.vehicleModel
-      .findOneAndDelete({
+      .findOne({
         _id: new Types.ObjectId(vehicleId),
         agencyId: new Types.ObjectId(agencyId),
       })
@@ -120,6 +124,15 @@ export class VehicleService {
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
+
+    // 2. Cleanup Drivers if assigned
+    await this.driverModel.updateMany(
+      { assignedVehicle: vehicle._id },
+      { $set: { assignedVehicle: null } }
+    ).exec();
+
+    // 3. Delete Vehicle
+    await this.vehicleModel.deleteOne({ _id: vehicle._id }).exec();
 
     return vehicle;
   }

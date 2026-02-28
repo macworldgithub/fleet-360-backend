@@ -196,9 +196,14 @@ export class MaintenanceService {
       }
     }
 
-    // Revert vehicle status back to ACTIVATE
+    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
+    const newStatus = vehicle?.currentDriverId 
+      ? VehicleStatus.ASSIGNED 
+      : VehicleStatus.ACTIVATE;
+
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
-      $set: { vehicleStatus: VehicleStatus.ACTIVATE },
+      $set: { vehicleStatus: newStatus },
     });
 
     return maintenance;
@@ -284,9 +289,14 @@ export class MaintenanceService {
     maintenance.scheduledServiceDate = scheduledServiceDate;
     await maintenance.save();
 
-    // Revert vehicle status back to ACTIVATE
+    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
+    const newStatus = vehicle?.currentDriverId 
+      ? VehicleStatus.ASSIGNED 
+      : VehicleStatus.ACTIVATE;
+
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
-      $set: { vehicleStatus: VehicleStatus.ACTIVATE },
+      $set: { vehicleStatus: newStatus },
     });
 
     return maintenance;
