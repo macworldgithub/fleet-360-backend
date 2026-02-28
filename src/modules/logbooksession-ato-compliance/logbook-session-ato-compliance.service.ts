@@ -175,11 +175,17 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── lockLogbookSession ──────────────────────────────────────────────
 
-  async lockLogbookSession(sessionId: string, userId: string) {
+  async lockLogbookSession(sessionId: string, userId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
     this.validateObjectId(userId, 'userId');
+    this.validateObjectId(agencyId, 'agencyId');
 
-    const session = await this.sessionModel.findById(sessionId).exec();
+    const session = await this.sessionModel
+      .findOne({
+        _id: new Types.ObjectId(sessionId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
 
     if (!session) {
       throw new NotFoundException('Logbook session not found.');
@@ -254,12 +260,14 @@ export class LogbookSessionAtoComplianceService {
     }
   }
 
-  async getLiveSummary(vehicleId: string) {
+  async getLiveSummary(vehicleId: string, agencyId: string) {
     this.validateObjectId(vehicleId, 'vehicleId');
+    this.validateObjectId(agencyId, 'agencyId');
 
     const session = await this.sessionModel
       .findOne({
         vehicleId: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
         isLocked: false,
       })
       .lean()
@@ -286,10 +294,17 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionById ──────────────────────────────────────────────────
 
-  async getSessionById(sessionId: string) {
+  async getSessionById(sessionId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
+    this.validateObjectId(agencyId, 'agencyId');
 
-    const session = await this.sessionModel.findById(sessionId).lean().exec();
+    const session = await this.sessionModel
+      .findOne({
+        _id: new Types.ObjectId(sessionId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .lean()
+      .exec();
 
     if (!session) {
       throw new NotFoundException('Logbook session not found.');
@@ -300,11 +315,15 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionsByVehicle ────────────────────────────────────────────
 
-  async getSessionsByVehicle(vehicleId: string) {
+  async getSessionsByVehicle(vehicleId: string, agencyId: string) {
     this.validateObjectId(vehicleId, 'vehicleId');
+    this.validateObjectId(agencyId, 'agencyId');
 
     return this.sessionModel
-      .find({ vehicleId: new Types.ObjectId(vehicleId) })
+      .find({
+        vehicleId: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .sort({ startDate: -1 })
       .lean()
       .exec();
@@ -312,8 +331,17 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getAuditsBySession ───────────────────────────────────────────────
 
-  async getAuditsBySession(sessionId: string) {
+  async getAuditsBySession(sessionId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
+    this.validateObjectId(agencyId, 'agencyId');
+
+    // Verify session ownership first
+    const session = await this.sessionModel.findOne({
+      _id: new Types.ObjectId(sessionId),
+      agencyId: new Types.ObjectId(agencyId),
+    }).exec();
+
+    if (!session) throw new NotFoundException('Session not found');
 
     return this.auditModel
       .find({ sessionId: new Types.ObjectId(sessionId) })

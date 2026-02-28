@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -33,26 +34,27 @@ export class KmLogsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a KM log (Trip log)' })
-  create(@Body() dto: CreateKmLogDto) {
-    return this.kmLogsService.create(dto);
+  create(@Req() req, @Body() dto: CreateKmLogDto) {
+    const agencyId = req.user.agencyId;
+    return this.kmLogsService.create(dto, agencyId);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all KM logs (Trips)' })
   @ApiQuery({ name: 'vehicleId', required: false })
-  @ApiQuery({ name: 'agencyId', required: false })
   @ApiQuery({ name: 'officeId', required: false })
   @ApiQuery({ name: 'tripType', required: false })
   @ApiQuery({ name: 'fromDate', required: false, example: '2026-02-01' })
   @ApiQuery({ name: 'toDate', required: false, example: '2026-02-18' })
   findAll(
+    @Req() req,
     @Query('vehicleId') vehicleId?: string,
-    @Query('agencyId') agencyId?: string,
     @Query('officeId') officeId?: string,
     @Query('tripType') tripType?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
+    const agencyId = req.user.agencyId;
     return this.kmLogsService.findAll({
       vehicleId,
       agencyId,
@@ -66,21 +68,24 @@ export class KmLogsController {
   @Get(':logId')
   @ApiOperation({ summary: 'Get KM log by ID' })
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
-  findOne(@Param('logId') logId: string) {
-    return this.kmLogsService.findOne(logId);
+  findOne(@Req() req, @Param('logId') logId: string) {
+    const agencyId = req.user.agencyId;
+    return this.kmLogsService.findOne(logId, agencyId);
   }
 
   @Patch(':logId')
   @ApiOperation({ summary: 'Update KM log by ID' })
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
-  update(@Param('logId') logId: string, @Body() dto: UpdateKmLogDto) {
-    return this.kmLogsService.update(logId, dto);
+  update(@Req() req, @Param('logId') logId: string, @Body() dto: UpdateKmLogDto) {
+    const agencyId = req.user.agencyId;
+    return this.kmLogsService.update(logId, dto, agencyId);
   }
 
   @Delete(':logId')
   @ApiOperation({ summary: 'Delete KM log by ID' })
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
-  remove(@Param('logId') logId: string) {
-    return this.kmLogsService.remove(logId);
+  remove(@Req() req, @Param('logId') logId: string) {
+    const agencyId = req.user.agencyId;
+    return this.kmLogsService.remove(logId, agencyId);
   }
 }

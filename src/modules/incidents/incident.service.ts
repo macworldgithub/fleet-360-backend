@@ -49,38 +49,50 @@ export class IncidentService {
     });
   }
 
-  async findAll(filters: any) {
-    const query: any = { isDeleted: false };
+  async findAll(agencyId: string, vehicleId?: string) {
+    const query: any = { 
+      isDeleted: false,
+      agencyId: new Types.ObjectId(agencyId),
+    };
 
-    if (filters.agencyId) query.agencyId = filters.agencyId;
-    if (filters.vehicleId) query.vehicleId = filters.vehicleId;
+    if (vehicleId) query.vehicleId = new Types.ObjectId(vehicleId);
 
-    return this.incidentModel.find(query).sort({ createdAt: -1 });
+    return this.incidentModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
-  async findOne(id: string) {
-    const incident = await this.incidentModel.findById(id);
+  async findOne(id: string, agencyId: string) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+
+    const incident = await this.incidentModel.findOne({
+      _id: new Types.ObjectId(id),
+      agencyId: new Types.ObjectId(agencyId),
+    }).exec();
+
     if (!incident) throw new NotFoundException('Incident not found');
     return incident;
   }
 
-  async update(id: string, dto: UpdateIncidentDto) {
-    const incident = await this.incidentModel.findByIdAndUpdate(
-      id,
+  async update(id: string, dto: UpdateIncidentDto, agencyId: string) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+
+    const incident = await this.incidentModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(agencyId) },
       dto,
       { new: true },
-    );
+    ).exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
     return incident;
   }
 
-  async remove(id: string) {
-    const incident = await this.incidentModel.findByIdAndUpdate(
-      id,
+  async remove(id: string, agencyId: string) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+
+    const incident = await this.incidentModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(agencyId) },
       { isDeleted: true },
       { new: true },
-    );
+    ).exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
     return incident;

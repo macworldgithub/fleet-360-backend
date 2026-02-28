@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,37 +32,44 @@ export class IncidentController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  // @UseInterceptors(FilesInterceptor('photos', 5)) 
   @ApiOperation({ summary: 'Create Incident' })
   create(
-    @Query('agencyId') agencyId: string,
+    @Req() req,
     @Query('vehicleId') vehicleId: string,
     @Body() dto: CreateIncidentDto,
-    // @UploadedFiles() photos: any[], 
   ) {
+    const agencyId = req.user.agencyId;
     return this.incidentService.create(agencyId, vehicleId, dto);
   }
 
   @Get()
   findAll(
-    @Query('agencyId') agencyId?: string,
+    @Req() req,
     @Query('vehicleId') vehicleId?: string,
   ) {
-    return this.incidentService.findAll({ agencyId, vehicleId });
+    const agencyId = req.user.agencyId;
+    return this.incidentService.findAll(agencyId, vehicleId);
   }
 
   @Get(':incidentId')
-  findOne(@Param('incidentId') id: string) {
-    return this.incidentService.findOne(id);
+  findOne(@Req() req, @Param('incidentId') id: string) {
+    const agencyId = req.user.agencyId;
+    return this.incidentService.findOne(id, agencyId);
   }
 
   @Patch(':incidentId')
-  update(@Param('incidentId') id: string, @Body() dto: UpdateIncidentDto) {
-    return this.incidentService.update(id, dto);
+  update(
+    @Req() req,
+    @Param('incidentId') id: string,
+    @Body() dto: UpdateIncidentDto,
+  ) {
+    const agencyId = req.user.agencyId;
+    return this.incidentService.update(id, dto, agencyId);
   }
 
   @Delete(':incidentId')
-  remove(@Param('incidentId') id: string) {
-    return this.incidentService.remove(id);
+  remove(@Req() req, @Param('incidentId') id: string) {
+    const agencyId = req.user.agencyId;
+    return this.incidentService.remove(id, agencyId);
   }
 }

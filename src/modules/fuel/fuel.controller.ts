@@ -34,21 +34,28 @@ export class FuelController {
   @Get('fuel-transactions')
   @ApiOperation({ summary: 'Get fuel transactions' })
   findAll(
-    @Query('agencyId') agencyId?: string,
+    @Query('agencyId') agencyId: string,
     @Query('vehicleId') vehicleId?: string,
   ) {
-    return this.fuelService.findAll({ agencyId, vehicleId });
+    return this.fuelService.findAll({ vehicleId }, agencyId);
   }
 
   @Get('fuel-transactions/:id')
   @ApiOperation({ summary: 'Get fuel transaction by ID' })
-  findOne(@Param('id') id: string) {
-    return this.fuelService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @Query('agencyId') agencyId: string,
+  ) {
+    return this.fuelService.findOne(id, agencyId);
   }
 
   @Patch('fuel-transactions/:id')
   @ApiOperation({ summary: 'Update fuel transaction' })
-  update(@Param('id') id: string, @Body() dto: UpdateFuelTransactionDto) {
-    return this.fuelService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Query('agencyId') agencyId: string,
+    @Body() dto: UpdateFuelTransactionDto,
+  ) {
+    return this.fuelService.update(id, dto, agencyId);
   }
 }
