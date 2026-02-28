@@ -14,6 +14,8 @@ export enum VehicleStatus {
   ACTIVATE = 'ACTIVATE',
   DEACTIVATE = 'DEACTIVATE',
   IN_MAINTENANCE = 'IN_MAINTENANCE',
+  UNDER_AGREEMENT = 'UNDER_AGREEMENT',
+  ASSIGNED = 'ASSIGNED',
 }
 
 export enum LeaseType {
@@ -95,6 +97,15 @@ export class Vehicle {
 
   @Prop()
   depreciationRate: number;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  requestedBy: Types.ObjectId;
+
+  @Prop({ type: Date, default: null })
+  requestedAt: Date;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  currentDriverId: Types.ObjectId;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

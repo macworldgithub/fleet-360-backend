@@ -89,4 +89,32 @@ export class DriverController {
     const agencyId = req.user.agencyId;
     return this.driverService.unassignVehicle(driverId, vehicleId, agencyId);
   }
+
+  // ─── Vehicle Request / Approval Workflow ─────────────────────────────────────
+
+  @Post(':driverId/request-vehicle/:vehicleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Driver requests a vehicle' })
+  requestVehicle(
+    @Req() req,
+    @Param('driverId') driverId: string,
+    @Param('vehicleId') vehicleId: string,
+  ) {
+    const agencyId = req.user.agencyId;
+    return this.driverService.requestVehicle(vehicleId, driverId, agencyId);
+  }
+
+  @Patch('approve-vehicle/:vehicleId')
+  @ApiOperation({ summary: 'Approve a vehicle request' })
+  approveVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    return this.driverService.approveVehicle(vehicleId, agencyId);
+  }
+
+  @Patch('reject-vehicle/:vehicleId')
+  @ApiOperation({ summary: 'Reject a vehicle request' })
+  rejectVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    return this.driverService.rejectVehicle(vehicleId, agencyId);
+  }
 }
