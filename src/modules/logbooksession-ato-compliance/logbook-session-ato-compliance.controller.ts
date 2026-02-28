@@ -38,7 +38,8 @@ export class LogbookSessionAtoComplianceController {
   })
   create(@Req() req, @Body() dto: CreateLogbookSessionDto) {
     const agencyId = req.user.agencyId;
-    const userId = req.user._id || req.user.userId;
+    // Fallback to agencyId if userId is not present (for Agency admin accounts)
+    const userId = req.user.userId || req.user._id || agencyId;
     return this.service.createLogbookSession(dto, agencyId, userId);
   }
 
@@ -52,8 +53,8 @@ export class LogbookSessionAtoComplianceController {
   })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
   lock(@Req() req, @Param('id') id: string) {
-    const userId = req.user._id;
     const agencyId = req.user.agencyId;
+    const userId = req.user.userId || req.user._id || agencyId;
     return this.service.lockLogbookSession(id, userId, agencyId);
   }
 
