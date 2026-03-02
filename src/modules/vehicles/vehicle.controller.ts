@@ -35,7 +35,8 @@ export class VehicleController {
   @ApiOperation({ summary: 'Create a new vehicle' })
   create(@Req() req, @Body() createVehicleDto: CreateVehicleDto) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.create(createVehicleDto, agencyId);
+    const userId = req.user.agencyId || req.user.userId;
+    return this.vehicleService.create(createVehicleDto, agencyId, userId);
   }
 
   @Get()

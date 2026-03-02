@@ -20,7 +20,7 @@ export enum VehicleStatus {
 
 export enum LeaseType {
   OWNED = 'OWNED',
-  LEASED = 'LEASED',
+  LOAN = 'LOAN',
 }
 
 @Schema({ timestamps: true })
@@ -64,7 +64,7 @@ export class Vehicle {
   @Prop()
   purchaseCost: number;
 
-  @Prop({ required: true, enum: LeaseType })
+  @Prop({ required: true, enum: LeaseType, default: LeaseType.OWNED })
   leaseType: LeaseType;
 
   @Prop()
@@ -111,6 +111,9 @@ export class Vehicle {
 
   @Prop({ type: Types.ObjectId, default: null })
   requestedBy: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  createdBy: Types.ObjectId;
 
   @Prop({ type: Date, default: null })
   requestedAt: Date;
