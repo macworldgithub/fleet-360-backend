@@ -312,6 +312,7 @@ export class MaintenanceService {
     vehicleId: string,
     agencyId: string,
     currentOdometerKm: number,
+    userId?: string,
   ): Promise<void> {
     const vehicleOid = new Types.ObjectId(vehicleId);
     const agencyOid = new Types.ObjectId(agencyId);
@@ -331,7 +332,7 @@ export class MaintenanceService {
         return d;
       })(),
       completedAt: new Date(),
-      createdBy: null,
+      createdBy: userId ? new Types.ObjectId(userId) : null,
     });
 
     await seedMaintenance.save();

@@ -57,7 +57,7 @@ export class Maintenance {
   @Prop({ enum: MaintenanceStatus, default: MaintenanceStatus.DRAFT })
   status: MaintenanceStatus;
 
-  @Prop({ type: Types.ObjectId, required: true })
+  @Prop({ type: Types.ObjectId, required: false, default: null })
   createdBy: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, default: null })

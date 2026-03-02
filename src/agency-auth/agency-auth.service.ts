@@ -48,7 +48,7 @@ export class AgencyAuthService {
     if (existing)
       throw new BadRequestException('Agency email already registered');
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const agency = await this.agenciesService.create({
       agencyName: dto.agencyName,
@@ -59,7 +59,7 @@ export class AgencyAuthService {
       country: dto.country ?? undefined,
       state: dto.state ?? undefined,
       city: dto.city ?? undefined,
-      password: passwordHash,
+      password: dto.password,
       role: dto.role,
     });
 
@@ -72,7 +72,8 @@ export class AgencyAuthService {
   async login(dto: AgencyLoginDto) {
     const agency = await this.agenciesService.findByEmail(dto.contactEmail);
     if (!agency) throw new UnauthorizedException('Invalid credentials');
-
+    console.log(dto.password)
+    console.log(agency.passwordHash)
     const valid = await bcrypt.compare(dto.password, agency.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 

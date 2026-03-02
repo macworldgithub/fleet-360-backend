@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -37,6 +38,7 @@ export class VehicleService {
   async create(
     createVehicleDto: CreateVehicleDto,
     agencyId: string,
+    userId: string,
   ): Promise<VehicleDocument> {
     const vehicleData: any = {
       ...createVehicleDto,
@@ -48,6 +50,20 @@ export class VehicleService {
       vehicleData.officeId = new Types.ObjectId(createVehicleDto.officeId);
     }
 
+    // Check for duplicate VIN to avoid 500 error
+    const existingVehicle = await this.vehicleModel.findOne({ vin: createVehicleDto.vin }).exec();
+    if (existingVehicle) {
+      throw new ConflictException(`Vehicle with VIN ${createVehicleDto.vin} already exists`);
+    }
+
+    if (userId) {
+      this.validateObjectId(userId, 'userId');
+      const userOid = new Types.ObjectId(userId);
+      vehicleData.createdBy = userOid;
+      vehicleData.requestedBy = userOid;
+      vehicleData.requestedAt = new Date();
+    }
+
     const vehicle = new this.vehicleModel(vehicleData);
     const saved = await vehicle.save();
 
@@ -56,6 +72,7 @@ export class VehicleService {
       saved._id.toString(),
       agencyId,
       createVehicleDto.odometerInKms || 0,
+      userId,
     );
 
     return saved;
