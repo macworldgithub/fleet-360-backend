@@ -67,29 +67,41 @@ export class Vehicle {
   @Prop({ required: true, enum: LeaseType })
   leaseType: LeaseType;
 
-  @Prop({ type: Date })
-  leaseExpiryDate: Date;
-
-  @Prop({ trim: true })
-  leaseProvider: string;
-
-  @Prop({ type: Date })
-  leaseStartDate: Date;
-
-  @Prop()
-  monthlyLeasePayment: number;
-
-  @Prop()
-  leaseMileageAllowance: number;
-
-  @Prop({ trim: true })
-  leaseTerms: string;
-
   @Prop()
   residualValue: number;
 
   @Prop({ trim: true })
-  externalLeaseId: string;
+  loanProvider: string;
+
+  @Prop()
+  loanAmount: number;
+
+  @Prop()
+  interestRate: number;
+
+  @Prop()
+  loanTermMonths: number;
+
+  @Prop()
+  monthlyLoanRepayment: number;
+
+  @Prop()
+  balloonPayment: number;
+
+  @Prop({ type: Date })
+  loanStartDate: Date;
+
+  @Prop({ type: Date })
+  loanEndDate: Date;
+
+  @Prop({ trim: true })
+  lenderReferenceNumber: string;
+
+  @Prop({ trim: true })
+  loanType: string;
+
+  @Prop({ default: false })
+  insuranceRequired: boolean;
 
   @Prop()
   fbtValue: number;
