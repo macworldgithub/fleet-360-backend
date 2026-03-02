@@ -15,6 +15,11 @@ export class CreateVehicleDto {
   @IsNotEmpty()
   vin: string;
 
+  @ApiPropertyOptional({ example: '65f1a2b3c4d5e6f7a8b9c0d1' })
+  @IsString()
+  @IsOptional()
+  officeId?: string;
+
   @ApiProperty({ example: 'ABC-1234' })
   @IsString()
   @IsNotEmpty()

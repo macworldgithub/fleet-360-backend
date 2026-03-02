@@ -21,7 +21,6 @@ export enum VehicleStatus {
 export enum LeaseType {
   OWNED = 'OWNED',
   LEASED = 'LEASED',
-  FINANCED = 'FINANCED',
 }
 
 @Schema({ timestamps: true })
