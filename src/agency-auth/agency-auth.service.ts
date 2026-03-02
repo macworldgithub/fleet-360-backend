@@ -54,14 +54,13 @@ export class AgencyAuthService {
       agencyName: dto.agencyName,
       contactEmail: dto.contactEmail,
       contactPhone: dto.contactPhone,
-      abn: dto.abn ?? null,
-      address: dto.address ?? null,
+      abn: dto.abn,
+      address: dto.address,
       country: dto.country ?? undefined,
       state: dto.state ?? undefined,
       city: dto.city ?? undefined,
-      passwordHash,
+      password: passwordHash,
       role: dto.role,
-      isEmailVerified: true,
     });
 
     return {

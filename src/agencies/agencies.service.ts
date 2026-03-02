@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Agency, AgencyDocument } from './schemas/agency.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { CreateAgencyDto } from './dto/create-agency.dto';
 
 @Injectable()
 export class AgenciesService {
@@ -10,13 +16,31 @@ export class AgenciesService {
     @InjectModel(Agency.name) private agencyModel: Model<AgencyDocument>,
   ) {}
 
-  async create(data: any) {
+  async create(data: CreateAgencyDto) {
+    const existingEmail = await this.agencyModel.findOne({
+      contactEmail: data.contactEmail.toLowerCase(),
+    });
+
+    if (existingEmail) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const existingAgency = await this.findByName(data.agencyName);
+    if (existingAgency) {
+      throw new ConflictException('Agency name already exists');
+    }
+
+    if (!data.password) {
+      throw new BadRequestException('Password is required');
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     const { password, ...rest } = data;
 
     return this.agencyModel.create({
       ...rest,
+      contactEmail: data.contactEmail.toLowerCase(),
       passwordHash,
     });
   }
