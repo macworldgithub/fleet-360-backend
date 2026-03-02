@@ -153,24 +153,47 @@ export class DriverService {
     this.validateObjectId(vehicleId, 'Vehicle ID');
     this.validateObjectId(agencyId, 'agencyId');
 
-    // 1. Update Driver
-    const driver = await this.driverModel
-      .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(driverId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
-        { $set: { assignedVehicle: new Types.ObjectId(vehicleId) } },
-        { new: true },
-      )
-      .populate('assignedVehicle')
+    // 1. Check if vehicle is already assigned or in maintenance
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .exec();
 
-    if (!driver) {
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
+    }
+
+    if (
+      vehicle.vehicleStatus === VehicleStatus.DEACTIVATE ||
+      vehicle.vehicleStatus === VehicleStatus.IN_MAINTENANCE ||
+      vehicle.vehicleStatus === VehicleStatus.ASSIGNED
+    ) {
+      throw new BadRequestException(
+        `Cannot assign vehicle in ${vehicle.vehicleStatus} status`,
+      );
+    }
+
+    // 2. Check if driver already has an assigned vehicle
+    const existingDriver = await this.driverModel
+      .findOne({
+        _id: new Types.ObjectId(driverId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
+
+    if (!existingDriver) {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
     }
 
-    // 2. Update Vehicle Status
+    if (existingDriver.assignedVehicle) {
+      throw new BadRequestException(
+        `Driver already has an assigned vehicle: ${existingDriver.assignedVehicle}`,
+      );
+    }
+
+    // 3. Update Vehicle Status FIRST
     await this.vehicleModel
       .findOneAndUpdate(
         {
@@ -188,6 +211,23 @@ export class DriverService {
       )
       .exec();
 
+    // 4. Update Driver and POPULATE (will pick up updated vehicle)
+    const driver = await this.driverModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(driverId),
+          agencyId: new Types.ObjectId(agencyId),
+        },
+        { $set: { assignedVehicle: new Types.ObjectId(vehicleId) } },
+        { new: true },
+      )
+      .populate('assignedVehicle')
+      .exec();
+
+    if (!driver) {
+      throw new NotFoundException(`Driver with ID ${driverId} not found`);
+    }
+
     return driver;
   }
 
@@ -200,7 +240,27 @@ export class DriverService {
     this.validateObjectId(vehicleId, 'Vehicle ID');
     this.validateObjectId(agencyId, 'agencyId');
 
-    // 1. Update Driver
+    // 1. Revert Vehicle Status FIRST
+    // If the vehicle is CURRENTLY assigned to this driver, revert to ACTIVATE
+    await this.vehicleModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(vehicleId),
+          agencyId: new Types.ObjectId(agencyId),
+          currentDriverId: new Types.ObjectId(driverId), // Strictly unassign if this driver is indeed the current driver
+        },
+        {
+          $set: {
+            vehicleStatus: VehicleStatus.ACTIVATE,
+            currentDriverId: null,
+            requestedBy: null,
+            requestedAt: null,
+          },
+        },
+      )
+      .exec();
+
+    // 2. Update Driver
     const driver = await this.driverModel
       .findOneAndUpdate(
         {
@@ -219,24 +279,6 @@ export class DriverService {
         `Driver with ID ${driverId} not found or vehicle not assigned`,
       );
     }
-
-    // 2. Revert Vehicle Status
-    await this.vehicleModel
-      .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
-        {
-          $set: {
-            vehicleStatus: VehicleStatus.ACTIVATE,
-            currentDriverId: null,
-            requestedBy: null,
-            requestedAt: null,
-          },
-        },
-      )
-      .exec();
 
     return driver;
   }
