@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,9 +25,7 @@ import { LockLogbookSessionDto } from './dto/lock-logbook-session.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('api/logbook-sessions')
 export class LogbookSessionAtoComplianceController {
-  constructor(
-    private readonly service: LogbookSessionAtoComplianceService,
-  ) {}
+  constructor(private readonly service: LogbookSessionAtoComplianceService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -37,8 +36,11 @@ export class LogbookSessionAtoComplianceController {
       'checks for overlapping sessions, aggregates km data from existing KmLog trips, ' +
       'and attaches the session ID to matching trips.',
   })
-  create(@Body() dto: CreateLogbookSessionDto) {
-    return this.service.createLogbookSession(dto);
+  create(@Req() req, @Body() dto: CreateLogbookSessionDto) {
+    const agencyId = req.user.agencyId;
+    // Fallback to agencyId if userId is not present (for Agency admin accounts)
+    const userId = req.user.userId || req.user._id || agencyId;
+    return this.service.createLogbookSession(dto, agencyId, userId);
   }
 
   @Post(':id/lock')
@@ -50,35 +52,42 @@ export class LogbookSessionAtoComplianceController {
       'Requires the minimum ATO period to be satisfied.',
   })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
-  lock(@Param('id') id: string, @Body() dto: LockLogbookSessionDto) {
-    return this.service.lockLogbookSession(id, dto.userId);
+  lock(@Req() req, @Param('id') id: string) {
+    const agencyId = req.user.agencyId;
+    const userId = req.user.userId || req.user._id || agencyId;
+    return this.service.lockLogbookSession(id, userId, agencyId);
   }
 
   @Get(':id/audits')
   @ApiOperation({
     summary: 'Get audit trail for a logbook session',
-    description: 'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
+    description:
+      'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
   })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
-  getAudits(@Param('id') id: string) {
-    return this.service.getAuditsBySession(id);
+  getAudits(@Req() req, @Param('id') id: string) {
+    const agencyId = req.user.agencyId;
+    return this.service.getAuditsBySession(id, agencyId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get logbook session by ID' })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
-  findOne(@Param('id') id: string) {
-    return this.service.getSessionById(id);
+  findOne(@Req() req, @Param('id') id: string) {
+    const agencyId = req.user.agencyId;
+    return this.service.getSessionById(id, agencyId);
   }
 
   @Get('live/:vehicleId')
   @ApiOperation({
     summary: 'Get live logbook summary for a vehicle',
-    description: 'Returns the current active (unlocked) session with real-time totals and trip list.',
+    description:
+      'Returns the current active (unlocked) session with real-time totals and trip list.',
   })
   @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
-  getLiveSummary(@Param('vehicleId') vehicleId: string) {
-    return this.service.getLiveSummary(vehicleId);
+  getLiveSummary(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    return this.service.getLiveSummary(vehicleId, agencyId);
   }
 
   @Get('vehicle/:vehicleId')
@@ -87,7 +96,8 @@ export class LogbookSessionAtoComplianceController {
     description: 'Returns sessions sorted by start date descending.',
   })
   @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
-  findByVehicle(@Param('vehicleId') vehicleId: string) {
-    return this.service.getSessionsByVehicle(vehicleId);
+  findByVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    return this.service.getSessionsByVehicle(vehicleId, agencyId);
   }
 }

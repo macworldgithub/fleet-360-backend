@@ -17,7 +17,11 @@ import {
   ComplianceAuditDocument,
   AuditAction,
 } from './schemas/compliance-audit.schema';
-import { KmLog, KmLogDocument, TripType } from '../km-logs/schemas/km-log.schema';
+import {
+  KmLog,
+  KmLogDocument,
+  TripType,
+} from '../km-logs/schemas/km-log.schema';
 import { CreateLogbookSessionDto } from './dto/create-logbook-session.dto';
 
 /** ATO minimum continuous logbook period: 12 weeks = 84 days */
@@ -54,14 +58,18 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── createLogbookSession ────────────────────────────────────────────
 
-  async createLogbookSession(dto: CreateLogbookSessionDto) {
+  async createLogbookSession(
+    dto: CreateLogbookSessionDto,
+    agencyId: string,
+    performedBy: string,
+  ) {
     this.validateObjectId(dto.vehicleId, 'vehicleId');
-    this.validateObjectId(dto.agencyId, 'agencyId');
-    this.validateObjectId(dto.performedBy, 'performedBy');
+    this.validateObjectId(agencyId, 'agencyId');
+    this.validateObjectId(performedBy, 'performedBy');
 
     const vehicleOid = new Types.ObjectId(dto.vehicleId);
-    const agencyOid = new Types.ObjectId(dto.agencyId);
-    const performedByOid = new Types.ObjectId(dto.performedBy);
+    const agencyOid = new Types.ObjectId(agencyId);
+    const performedByOid = new Types.ObjectId(performedBy);
 
     const startDate = new Date(dto.startDate);
     const endDate = dto.endDate ? new Date(dto.endDate) : null;
@@ -77,7 +85,10 @@ export class LogbookSessionAtoComplianceService {
         // Existing session that is still open (no endDate)
         { endDate: null },
         // Existing session that overlaps with the new range
-        { startDate: { $lte: endDate || new Date() }, endDate: { $gte: startDate } },
+        {
+          startDate: { $lte: endDate || new Date() },
+          endDate: { $gte: startDate },
+        },
       ],
     };
 
@@ -87,7 +98,10 @@ export class LogbookSessionAtoComplianceService {
       overlappingQuery.endDate = null;
     }
 
-    const overlapping = await this.sessionModel.findOne(overlappingQuery).lean().exec();
+    const overlapping = await this.sessionModel
+      .findOne(overlappingQuery)
+      .lean()
+      .exec();
 
     if (overlapping) {
       throw new ConflictException(
@@ -161,11 +175,17 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── lockLogbookSession ──────────────────────────────────────────────
 
-  async lockLogbookSession(sessionId: string, userId: string) {
+  async lockLogbookSession(sessionId: string, userId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
     this.validateObjectId(userId, 'userId');
+    this.validateObjectId(agencyId, 'agencyId');
 
-    const session = await this.sessionModel.findById(sessionId).exec();
+    const session = await this.sessionModel
+      .findOne({
+        _id: new Types.ObjectId(sessionId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
 
     if (!session) {
       throw new NotFoundException('Logbook session not found.');
@@ -212,7 +232,8 @@ export class LogbookSessionAtoComplianceService {
       session.lockedBy = userOid;
 
       // ATO validity check at the moment of locking
-      session.isValidForFbt = session.minimumPeriodSatisfied && session.businessKms > 0;
+      session.isValidForFbt =
+        session.minimumPeriodSatisfied && session.businessKms > 0;
 
       await session.save({ session: transactionSession });
 
@@ -239,19 +260,23 @@ export class LogbookSessionAtoComplianceService {
     }
   }
 
-  async getLiveSummary(vehicleId: string) {
+  async getLiveSummary(vehicleId: string, agencyId: string) {
     this.validateObjectId(vehicleId, 'vehicleId');
+    this.validateObjectId(agencyId, 'agencyId');
 
     const session = await this.sessionModel
       .findOne({
         vehicleId: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
         isLocked: false,
       })
       .lean()
       .exec();
 
     if (!session) {
-      throw new NotFoundException('No active logbook session found for this vehicle.');
+      throw new NotFoundException(
+        'No active logbook session found for this vehicle.',
+      );
     }
 
     const trips = await this.kmLogModel
@@ -269,11 +294,15 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionById ──────────────────────────────────────────────────
 
-  async getSessionById(sessionId: string) {
+  async getSessionById(sessionId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
+    this.validateObjectId(agencyId, 'agencyId');
 
     const session = await this.sessionModel
-      .findById(sessionId)
+      .findOne({
+        _id: new Types.ObjectId(sessionId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .lean()
       .exec();
 
@@ -286,11 +315,15 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionsByVehicle ────────────────────────────────────────────
 
-  async getSessionsByVehicle(vehicleId: string) {
+  async getSessionsByVehicle(vehicleId: string, agencyId: string) {
     this.validateObjectId(vehicleId, 'vehicleId');
+    this.validateObjectId(agencyId, 'agencyId');
 
     return this.sessionModel
-      .find({ vehicleId: new Types.ObjectId(vehicleId) })
+      .find({
+        vehicleId: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .sort({ startDate: -1 })
       .lean()
       .exec();
@@ -298,8 +331,17 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getAuditsBySession ───────────────────────────────────────────────
 
-  async getAuditsBySession(sessionId: string) {
+  async getAuditsBySession(sessionId: string, agencyId: string) {
     this.validateObjectId(sessionId, 'sessionId');
+    this.validateObjectId(agencyId, 'agencyId');
+
+    // Verify session ownership first
+    const session = await this.sessionModel.findOne({
+      _id: new Types.ObjectId(sessionId),
+      agencyId: new Types.ObjectId(agencyId),
+    }).exec();
+
+    if (!session) throw new NotFoundException('Session not found');
 
     return this.auditModel
       .find({ sessionId: new Types.ObjectId(sessionId) })

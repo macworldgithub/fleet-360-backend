@@ -10,15 +10,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MaintenanceType } from '../schemas/maintenance.schema';
 
 export class CreateMaintenanceDto {
-  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Vehicle ObjectId' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Vehicle ObjectId',
+  })
   @IsMongoId()
   @IsNotEmpty()
   vehicleId: string;
 
-  @ApiProperty({ 
-    enum: MaintenanceType, 
+  @ApiProperty({
+    enum: MaintenanceType,
     description: 'Type of maintenance',
-    example: MaintenanceType.OIL_CHANGE 
+    example: MaintenanceType.OIL_CHANGE,
   })
   @IsEnum(MaintenanceType)
   @IsNotEmpty()

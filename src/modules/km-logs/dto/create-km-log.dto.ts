@@ -58,7 +58,6 @@ export class CreateKmLogDto {
   @IsEnum(TripType)
   tripType: TripType;
 
-
   @ApiPropertyOptional({ example: 'Client visit trip' })
   @IsOptional()
   @IsString()

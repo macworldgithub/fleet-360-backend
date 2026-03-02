@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEnum,
+  MinLength,
+} from 'class-validator';
 import { SubscriptionTier, AgencyRole } from '../schemas/agency.schema';
 
 export class CreateAgencyDto {
@@ -27,6 +34,15 @@ export class CreateAgencyDto {
   @IsNotEmpty()
   contactPhone: string;
 
+  @ApiProperty({
+    example: 'SecurePass123',
+    minLength: 6,
+    description: 'Initial password set by principal',
+  })
+  @IsString()
+  @MinLength(6)
+  password: string;
+
   @ApiPropertyOptional({ example: '123 Collins Street, Melbourne' })
   @IsOptional()
   @IsString()
@@ -47,7 +63,10 @@ export class CreateAgencyDto {
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional({ enum: SubscriptionTier, example: SubscriptionTier.ESSENTIAL })
+  @ApiPropertyOptional({
+    enum: SubscriptionTier,
+    example: SubscriptionTier.ESSENTIAL,
+  })
   @IsOptional()
   @IsEnum(SubscriptionTier)
   subscriptionTier?: SubscriptionTier;

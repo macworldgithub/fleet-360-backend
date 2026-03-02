@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -10,14 +12,20 @@ import {
   VehicleDocument,
   VehicleStatus,
 } from './schemas/vehicle.schema';
+import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { MaintenanceService } from '../maintenance/maintenance.service';
 
 @Injectable()
 export class VehicleService {
   constructor(
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
+    @InjectModel(Driver.name)
+    private driverModel: Model<DriverDocument>,
+    @Inject(forwardRef(() => MaintenanceService))
+    private readonly maintenanceService: MaintenanceService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -26,31 +34,47 @@ export class VehicleService {
     }
   }
 
-  async create(createVehicleDto: CreateVehicleDto): Promise<VehicleDocument> {
-    const vehicle = new this.vehicleModel(createVehicleDto);
-    return vehicle.save();
+  async create(
+    createVehicleDto: CreateVehicleDto,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
+    const vehicle = new this.vehicleModel({
+      ...createVehicleDto,
+      agencyId: new Types.ObjectId(agencyId),
+    });
+    const saved = await vehicle.save();
+
+    // Bootstrap the preventive maintenance cycle for this new vehicle
+    await this.maintenanceService.bootstrapMaintenanceCycle(
+      saved._id.toString(),
+      agencyId,
+      createVehicleDto.odometerInKms || 0,
+    );
+
+    return saved;
   }
 
-  async findAll(officeId?: string): Promise<VehicleDocument[]> {
-    const filter: any = {};
+  async findAll(
+    agencyId: string,
+    officeId?: string,
+  ): Promise<VehicleDocument[]> {
+    const filter: any = { agencyId: new Types.ObjectId(agencyId) };
 
     if (officeId) {
       this.validateObjectId(officeId, 'officeId');
       filter.officeId = new Types.ObjectId(officeId);
     }
 
-    return this.vehicleModel
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .exec();
+    return this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
   }
 
-  async findOne(vehicleId: string): Promise<VehicleDocument> {
+  async findOne(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const vehicle = await this.vehicleModel
       .findOne({
         _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
       })
       .exec();
 
@@ -64,12 +88,16 @@ export class VehicleService {
   async update(
     vehicleId: string,
     updateVehicleDto: UpdateVehicleDto,
+    agencyId: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        { _id: new Types.ObjectId(vehicleId) },
+        {
+          _id: new Types.ObjectId(vehicleId),
+          agencyId: new Types.ObjectId(agencyId),
+        },
         { $set: updateVehicleDto },
         { new: true },
       )
@@ -82,24 +110,45 @@ export class VehicleService {
     return vehicle;
   }
 
-  async remove(vehicleId: string): Promise<VehicleDocument> {
+  async remove(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    // 1. Find the vehicle
     const vehicle = await this.vehicleModel
-      .findOneAndDelete({ _id: new Types.ObjectId(vehicleId) })
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
       .exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
+    // 2. Cleanup Drivers if assigned
+    await this.driverModel.updateMany(
+      { assignedVehicle: vehicle._id },
+      { $set: { assignedVehicle: null } }
+    ).exec();
+
+    // 3. Delete Vehicle
+    await this.vehicleModel.deleteOne({ _id: vehicle._id }).exec();
+
     return vehicle;
   }
 
-  async toggleStatus(vehicleId: string): Promise<VehicleDocument> {
+  async toggleStatus(
+    vehicleId: string,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
-    const vehicle = await this.vehicleModel.findById(vehicleId).exec();
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);

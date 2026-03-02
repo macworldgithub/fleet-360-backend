@@ -29,7 +29,11 @@ export class AgencyAuthService {
     );
   }
 
-  private async signRefreshToken(agencyId: string, email: string, role: string) {
+  private async signRefreshToken(
+    agencyId: string,
+    email: string,
+    role: string,
+  ) {
     return this.jwtService.signAsync(
       { sub: agencyId, email, role, type: 'AGENCY' },
       {
@@ -78,7 +82,9 @@ export class AgencyAuthService {
     }
 
     if (agency.role !== dto.role) {
-      throw new UnauthorizedException('Role mismatch. You are not authorized for this role.');
+      throw new UnauthorizedException(
+        'Role mismatch. You are not authorized for this role.',
+      );
     }
 
     const accessToken = await this.signAccessToken(
