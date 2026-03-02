@@ -19,8 +19,8 @@ import { CreateFuelTransactionDto } from './dto/create-fuel-transaction.dto';
 import { UpdateFuelTransactionDto } from './dto/update-fuel-transaction.dto';
 
 @ApiTags('Fuel Transactions')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api')
 export class FuelController {
   constructor(private readonly fuelService: FuelService) {}

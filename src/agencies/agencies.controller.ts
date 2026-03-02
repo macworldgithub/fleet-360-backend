@@ -19,7 +19,6 @@ import { UpdateAgencyDto } from './dto/update-agency.dto';
 export class AgenciesController {
   constructor(private readonly agenciesService: AgenciesService) {}
 
-  // ADMIN USE (optional)
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -28,7 +27,6 @@ export class AgenciesController {
     return this.agenciesService.findAll();
   }
 
-  // ADMIN USE (optional)
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -37,7 +35,6 @@ export class AgenciesController {
     return this.agenciesService.create(dto);
   }
 
-  // REQUIRED
   @Get(':agencyId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -46,7 +43,6 @@ export class AgenciesController {
     return this.agenciesService.findById(agencyId);
   }
 
-  // REQUIRED
   @Patch(':agencyId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -55,7 +51,6 @@ export class AgenciesController {
     return this.agenciesService.updateById(agencyId, dto);
   }
 
-  // ADMIN ONLY (optional)
   @Delete(':agencyId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

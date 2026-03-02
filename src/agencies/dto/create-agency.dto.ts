@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsEnum,
+  MinLength,
 } from 'class-validator';
 import { SubscriptionTier, AgencyRole } from '../schemas/agency.schema';
 
@@ -32,6 +33,15 @@ export class CreateAgencyDto {
   @IsString()
   @IsNotEmpty()
   contactPhone: string;
+
+  @ApiProperty({
+    example: 'SecurePass123',
+    minLength: 6,
+    description: 'Initial password set by principal',
+  })
+  @IsString()
+  @MinLength(6)
+  password: string;
 
   @ApiPropertyOptional({ example: '123 Collins Street, Melbourne' })
   @IsOptional()

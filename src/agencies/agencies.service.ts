@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Agency, AgencyDocument } from './schemas/agency.schema';
 import { Model } from 'mongoose';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AgenciesService {
@@ -9,8 +10,15 @@ export class AgenciesService {
     @InjectModel(Agency.name) private agencyModel: Model<AgencyDocument>,
   ) {}
 
-  create(data: Partial<Agency>) {
-    return this.agencyModel.create(data);
+  async create(data: any) {
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    const { password, ...rest } = data;
+
+    return this.agencyModel.create({
+      ...rest,
+      passwordHash,
+    });
   }
 
   findByEmail(contactEmail: string) {
