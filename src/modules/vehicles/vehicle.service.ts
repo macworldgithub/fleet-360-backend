@@ -38,10 +38,17 @@ export class VehicleService {
     createVehicleDto: CreateVehicleDto,
     agencyId: string,
   ): Promise<VehicleDocument> {
-    const vehicle = new this.vehicleModel({
+    const vehicleData: any = {
       ...createVehicleDto,
       agencyId: new Types.ObjectId(agencyId),
-    });
+    };
+
+    if (createVehicleDto.officeId) {
+      this.validateObjectId(createVehicleDto.officeId, 'officeId');
+      vehicleData.officeId = new Types.ObjectId(createVehicleDto.officeId);
+    }
+
+    const vehicle = new this.vehicleModel(vehicleData);
     const saved = await vehicle.save();
 
     // Bootstrap the preventive maintenance cycle for this new vehicle
@@ -92,13 +99,20 @@ export class VehicleService {
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const updateData: any = { ...updateVehicleDto };
+
+    if (updateVehicleDto.officeId) {
+      this.validateObjectId(updateVehicleDto.officeId, 'officeId');
+      updateData.officeId = new Types.ObjectId(updateVehicleDto.officeId);
+    }
+
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
         {
           _id: new Types.ObjectId(vehicleId),
           agencyId: new Types.ObjectId(agencyId),
         },
-        { $set: updateVehicleDto },
+        { $set: updateData },
         { new: true },
       )
       .exec();

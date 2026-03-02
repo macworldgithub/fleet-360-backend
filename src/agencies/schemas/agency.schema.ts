@@ -16,7 +16,7 @@ export enum AgencyRole {
 
 @Schema({ timestamps: true })
 export class Agency {
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true, trim: true })
   agencyName: string;
 
   @Prop({ default: 'Real Estate Agency' })

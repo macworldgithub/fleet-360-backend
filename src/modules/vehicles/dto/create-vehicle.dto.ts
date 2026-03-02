@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsOptional,
   IsDateString,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FuelType, LeaseType, VehicleStatus } from '../schemas/vehicle.schema';
@@ -14,6 +15,11 @@ export class CreateVehicleDto {
   @IsString()
   @IsNotEmpty()
   vin: string;
+
+  @ApiPropertyOptional({ example: '65f1a2b3c4d5e6f7a8b9c0d1' })
+  @IsString()
+  @IsOptional()
+  officeId?: string;
 
   @ApiProperty({ example: 'ABC-1234' })
   @IsString()
@@ -67,45 +73,65 @@ export class CreateVehicleDto {
   @IsEnum(LeaseType)
   leaseType: LeaseType;
 
-  @ApiPropertyOptional({ example: '2027-01-15' })
-  @IsDateString()
-  @IsOptional()
-  leaseExpiryDate?: string;
-
-  @ApiPropertyOptional({ example: 'LeasePlan' })
-  @IsString()
-  @IsOptional()
-  leaseProvider?: string;
-
-  @ApiPropertyOptional({ example: '2024-01-15' })
-  @IsDateString()
-  @IsOptional()
-  leaseStartDate?: string;
-
-  @ApiPropertyOptional({ example: 450.5 })
-  @IsNumber()
-  @IsOptional()
-  monthlyLeasePayment?: number;
-
-  @ApiPropertyOptional({ example: 60000 })
-  @IsNumber()
-  @IsOptional()
-  leaseMileageAllowance?: number;
-
-  @ApiPropertyOptional({ example: '36 months, 20k km/year' })
-  @IsString()
-  @IsOptional()
-  leaseTerms?: string;
-
   @ApiPropertyOptional({ example: 15000 })
   @IsNumber()
   @IsOptional()
   residualValue?: number;
 
-  @ApiPropertyOptional({ example: 'LSE-998877' })
+  @ApiPropertyOptional({ example: 'Commonwealth Bank' })
   @IsString()
   @IsOptional()
-  externalLeaseId?: string;
+  loanProvider?: string;
+
+  @ApiPropertyOptional({ example: 25000 })
+  @IsNumber()
+  @IsOptional()
+  loanAmount?: number;
+
+  @ApiPropertyOptional({ example: 6.49 })
+  @IsNumber()
+  @IsOptional()
+  interestRate?: number;
+
+  @ApiPropertyOptional({ example: 60 })
+  @IsNumber()
+  @IsOptional()
+  loanTermMonths?: number;
+
+  @ApiPropertyOptional({ example: 483.2 })
+  @IsNumber()
+  @IsOptional()
+  monthlyLoanRepayment?: number;
+
+  @ApiPropertyOptional({ example: 5000 })
+  @IsNumber()
+  @IsOptional()
+  balloonPayment?: number;
+
+  @ApiPropertyOptional({ example: '2024-01-15' })
+  @IsDateString()
+  @IsOptional()
+  loanStartDate?: string;
+
+  @ApiPropertyOptional({ example: '2029-01-15' })
+  @IsDateString()
+  @IsOptional()
+  loanEndDate?: string;
+
+  @ApiPropertyOptional({ example: 'LN-778899' })
+  @IsString()
+  @IsOptional()
+  lenderReferenceNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Secured' })
+  @IsString()
+  @IsOptional()
+  loanType?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
+  @IsOptional()
+  insuranceRequired?: boolean;
 
   @ApiPropertyOptional({ example: 5000 })
   @IsNumber()
