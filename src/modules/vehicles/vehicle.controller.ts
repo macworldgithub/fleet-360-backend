@@ -21,6 +21,7 @@ import {
 import { VehicleService } from './vehicle.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { LoanRepaymentDto } from './dto/loan-repayment.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('Vehicles')
@@ -83,5 +84,18 @@ export class VehicleController {
   toggleStatus(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
     return this.vehicleService.toggleStatus(vehicleId, agencyId);
+  }
+
+  @Patch(':vehicleId/loan-repayment')
+  @ApiOperation({
+    summary: 'Make a loan repayment — deducts amount from vehicle loanAmount (LOAN vehicles only)',
+  })
+  makeLoanRepayment(
+    @Req() req,
+    @Param('vehicleId') vehicleId: string,
+    @Body() dto: LoanRepaymentDto,
+  ) {
+    const agencyId = req.user.agencyId;
+    return this.vehicleService.makeLoanRepayment(vehicleId, dto.amount, agencyId);
   }
 }

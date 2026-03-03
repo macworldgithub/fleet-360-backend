@@ -12,6 +12,7 @@ import {
   Vehicle,
   VehicleDocument,
   VehicleStatus,
+  LeaseType,
 } from './schemas/vehicle.schema';
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
@@ -197,6 +198,46 @@ export class VehicleService {
         : VehicleStatus.ACTIVATE;
 
     vehicle.vehicleStatus = newStatus;
+    return vehicle.save();
+  }
+
+  async makeLoanRepayment(
+    vehicleId: string,
+    amount: number,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
+    this.validateObjectId(vehicleId, 'Vehicle ID');
+
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
+
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
+    }
+
+    if (vehicle.leaseType !== LeaseType.LOAN) {
+      throw new BadRequestException(
+        'Loan repayment is only applicable for vehicles with leaseType LOAN',
+      );
+    }
+
+    if (!vehicle.loanAmount && vehicle.loanAmount !== 0) {
+      throw new BadRequestException(
+        'Vehicle does not have a loanAmount set',
+      );
+    }
+
+    if (amount > vehicle.loanAmount) {
+      throw new BadRequestException(
+        `Repayment amount (${amount}) exceeds remaining loan balance (${vehicle.loanAmount})`,
+      );
+    }
+
+    vehicle.loanAmount = vehicle.loanAmount - amount;
     return vehicle.save();
   }
 }
