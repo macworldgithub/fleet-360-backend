@@ -16,11 +16,8 @@ import {
   LogbookSession,
   LogbookSessionDocument,
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
-import {
-  Vehicle,
-  VehicleDocument,
-  VehicleStatus,
-} from '../vehicles/schemas/vehicle.schema';
+import { Vehicle, VehicleDocument, VehicleStatus } from '../vehicles/schemas/vehicle.schema';
+import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { AgencyRole } from '../../agencies/schemas/agency.schema';
 
@@ -37,6 +34,8 @@ export class MaintenanceService {
     private logbookSessionModel: Model<LogbookSessionDocument>,
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
+    @InjectModel(Driver.name)
+    private driverModel: Model<DriverDocument>,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -73,49 +72,22 @@ export class MaintenanceService {
       description: dto.description || null,
       odometerAtRequest: latestSession.endOdometerInKms,
       estimatedCost: dto.estimatedCost || null,
-      status: MaintenanceStatus.DRAFT,
+      status: MaintenanceStatus.SUBMITTED,
       createdBy: new Types.ObjectId(userId),
+      submittedBy: new Types.ObjectId(userId),
+      submittedAt: new Date(),
     });
 
-    return maintenance.save();
-  }
+    const saved = await maintenance.save();
 
-  // ===================== SUBMIT =====================
-
-  async submit(id: string, userId: string): Promise<MaintenanceDocument> {
-    this.validateObjectId(id, 'Maintenance ID');
-
-    const maintenance = await this.maintenanceModel.findById(id).exec();
-    if (!maintenance) {
-      throw new NotFoundException(`Maintenance with ID ${id} not found`);
-    }
-
-    // Only the creator can submit
-    if (maintenance.createdBy.toString() !== userId) {
-      throw new ForbiddenException(
-        'Only the creator can submit this maintenance request',
-      );
-    }
-
-    // Only DRAFT can move to SUBMITTED
-    if (maintenance.status !== MaintenanceStatus.DRAFT) {
-      throw new BadRequestException(
-        `Cannot submit maintenance in ${maintenance.status} status. Only DRAFT can be submitted.`,
-      );
-    }
-
-    maintenance.status = MaintenanceStatus.SUBMITTED;
-    maintenance.submittedBy = new Types.ObjectId(userId);
-    maintenance.submittedAt = new Date();
-    await maintenance.save();
-
-    // Update vehicle status to IN_MAINTENANCE
-    await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
+    // Automatically move vehicle to IN_MAINTENANCE status
+    await this.vehicleModel.findByIdAndUpdate(dto.vehicleId, {
       $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
     });
 
-    return maintenance;
+    return saved;
   }
+
 
   // ===================== APPROVE =====================
 
@@ -196,11 +168,17 @@ export class MaintenanceService {
       }
     }
 
-    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
     const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
-    const newStatus = vehicle?.currentDriverId 
-      ? VehicleStatus.ASSIGNED 
-      : VehicleStatus.ACTIVATE;
+    let newStatus = VehicleStatus.ACTIVATE;
+
+    if (vehicle?.currentDriverId) {
+      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      // If driver is still assigned to THIS specific vehicle
+      if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
+        newStatus = VehicleStatus.ASSIGNED;
+      }
+    }
 
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
       $set: { vehicleStatus: newStatus },
@@ -289,11 +267,17 @@ export class MaintenanceService {
     maintenance.scheduledServiceDate = scheduledServiceDate;
     await maintenance.save();
 
-    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
     const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
-    const newStatus = vehicle?.currentDriverId 
-      ? VehicleStatus.ASSIGNED 
-      : VehicleStatus.ACTIVATE;
+    let newStatus = VehicleStatus.ACTIVATE;
+
+    if (vehicle?.currentDriverId) {
+      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      // If driver is still assigned to THIS specific vehicle
+      if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
+        newStatus = VehicleStatus.ASSIGNED;
+      }
+    }
 
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
       $set: { vehicleStatus: newStatus },
@@ -369,11 +353,11 @@ export class MaintenanceService {
       return; // Hasn't reached the threshold yet
     }
 
-    // Check for existing DRAFT or SUBMITTED maintenance to prevent duplicates
+    // Check for existing SUBMITTED maintenance to prevent duplicates
     const existingActive = await this.maintenanceModel
       .findOne({
         vehicleId: vehicleOid,
-        status: { $in: [MaintenanceStatus.DRAFT, MaintenanceStatus.SUBMITTED] },
+        status: MaintenanceStatus.SUBMITTED,
       })
       .exec();
 

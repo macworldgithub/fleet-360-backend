@@ -18,6 +18,8 @@ import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
+import { AgenciesService } from '../../agencies/agencies.service';
+import { SubscriptionTier } from '../../agencies/schemas/agency.schema';
 
 @Injectable()
 export class VehicleService {
@@ -28,6 +30,7 @@ export class VehicleService {
     private driverModel: Model<DriverDocument>,
     @Inject(forwardRef(() => MaintenanceService))
     private readonly maintenanceService: MaintenanceService,
+    private readonly agenciesService: AgenciesService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -45,6 +48,15 @@ export class VehicleService {
       ...createVehicleDto,
       agencyId: new Types.ObjectId(agencyId),
     };
+
+    if (createVehicleDto.leaseType === LeaseType.LOAN) {
+      const agency = await this.agenciesService.findById(agencyId);
+      if (agency && agency.subscriptionTier === SubscriptionTier.ESSENTIAL) {
+        throw new BadRequestException(
+          'Agencies with ESSENTIAL subscription tier cannot add vehicles with LOAN lease type. Please upgrade to OPTIMISED or PARTNER tier.',
+        );
+      }
+    }
 
     if (createVehicleDto.officeId) {
       this.validateObjectId(createVehicleDto.officeId, 'officeId');
@@ -118,6 +130,15 @@ export class VehicleService {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const updateData: any = { ...updateVehicleDto };
+
+    if (updateVehicleDto.leaseType === LeaseType.LOAN) {
+      const agency = await this.agenciesService.findById(agencyId);
+      if (agency && agency.subscriptionTier === SubscriptionTier.ESSENTIAL) {
+        throw new BadRequestException(
+          'Agencies with ESSENTIAL subscription tier cannot use LOAN lease type. Please upgrade to OPTIMISED or PARTNER tier.',
+        );
+      }
+    }
 
     if (updateVehicleDto.officeId) {
       this.validateObjectId(updateVehicleDto.officeId, 'officeId');

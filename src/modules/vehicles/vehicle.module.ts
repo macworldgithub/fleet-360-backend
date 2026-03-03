@@ -5,6 +5,7 @@ import { Driver, DriverSchema } from '../drivers/schemas/driver.schema';
 import { VehicleService } from './vehicle.service';
 import { VehicleController } from './vehicle.controller';
 import { MaintenanceModule } from '../maintenance/maintenance.module';
+import { AgenciesModule } from '../../agencies/agencies.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MaintenanceModule } from '../maintenance/maintenance.module';
       { name: Driver.name, schema: DriverSchema },
     ]),
     forwardRef(() => MaintenanceModule),
+    AgenciesModule,
   ],
   controllers: [VehicleController],
   providers: [VehicleService],

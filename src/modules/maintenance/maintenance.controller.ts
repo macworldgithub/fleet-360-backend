@@ -57,15 +57,6 @@ export class MaintenanceController {
     return this.maintenanceService.create(dto, userId, agencyId);
   }
 
-  @Patch(':id/submit')
-  @ApiOperation({
-    summary: 'Submit a maintenance request (creator only, DRAFT → SUBMITTED)',
-  })
-  @ApiParam({ name: 'id', description: 'Maintenance ID' })
-  submit(@Req() req, @Param('id') id: string) {
-    const userId = req.user.agencyId || req.user.userId;
-    return this.maintenanceService.submit(id, userId);
-  }
 
   @Patch(':id/approve')
   @ApiOperation({
