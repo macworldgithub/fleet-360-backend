@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,7 +22,7 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
-import { CompleteMaintenanceDto } from './dtos/complete-maintenance.dto';
+import { UpdateMaintenanceStatusDto } from './dtos/update-maintenance-status.dto';
 import { MaintenanceStatus } from './schemas/maintenance.schema';
 
 @ApiTags('Maintenance')
@@ -58,42 +59,33 @@ export class MaintenanceController {
   }
 
 
-  @Patch(':id/approve')
+  @Patch(':id/status')
   @ApiOperation({
-    summary:
-      'Approve a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → APPROVED)',
+    summary: 'Update maintenance status (Dispatcher: APPROVE, REJECT, or COMPLETE)',
+    description: 'A single endpoint to handle status transitions. Logic varies based on the status provided.',
   })
   @ApiParam({ name: 'id', description: 'Maintenance ID' })
-  approve(@Req() req, @Param('id') id: string) {
-    const userId = req.user.agencyId || req.user.userId;
-    const role = req.user.role;
-    return this.maintenanceService.approve(id, userId, role);
-  }
-
-  @Patch(':id/reject')
-  @ApiOperation({
-    summary:
-      'Reject a maintenance request (PRINCIPAL/FLEET_MANAGER, SUBMITTED → REJECTED)',
-  })
-  @ApiParam({ name: 'id', description: 'Maintenance ID' })
-  reject(@Req() req, @Param('id') id: string) {
-    const userId = req.user.agencyId || req.user.userId;
-    const role = req.user.role;
-    return this.maintenanceService.reject(id, userId, role);
-  }
-
-  @Patch(':id/complete')
-  @ApiOperation({
-    summary: 'Complete a maintenance request (APPROVED → COMPLETED)',
-  })
-  @ApiParam({ name: 'id', description: 'Maintenance ID' })
-  complete(
+  async updateStatus(
     @Req() req,
     @Param('id') id: string,
-    @Body() dto: CompleteMaintenanceDto,
+    @Body() dto: UpdateMaintenanceStatusDto,
   ) {
     const userId = req.user.agencyId || req.user.userId;
-    return this.maintenanceService.complete(id, userId, dto.actualCost);
+    const role = req.user.role;
+
+    switch (dto.status) {
+      case MaintenanceStatus.APPROVED:
+        return this.maintenanceService.approve(id, userId, role);
+      case MaintenanceStatus.REJECTED:
+        return this.maintenanceService.reject(id, userId, role);
+      case MaintenanceStatus.COMPLETED:
+        if (dto.actualCost === undefined) {
+          throw new BadRequestException('actualCost is required for COMPLETED status');
+        }
+        return this.maintenanceService.complete(id, userId, dto.actualCost);
+      default:
+        throw new BadRequestException(`Unsupported status transition: ${dto.status}`);
+    }
   }
 
   @Get('vehicle/:vehicleId')
