@@ -14,6 +14,7 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { IncidentModule } from './modules/incidents/incident.module';
 import { AwsModule } from './aws/aws.module';
 import { FuelModule } from './modules/fuel/fuel.module';
+import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelligence.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { FuelModule } from './modules/fuel/fuel.module';
     MaintenanceModule,
     IncidentModule,
     FuelModule,
+    CostIntelligenceModule,
     AwsModule,
   ],
 })
