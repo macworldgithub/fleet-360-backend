@@ -120,6 +120,12 @@ export class Vehicle {
 
   @Prop({ type: Types.ObjectId, default: null })
   currentDriverId: Types.ObjectId;
+
+  @Prop({ type: Number, default: null })
+  nextServiceDueAtKm: number | null;
+
+  @Prop({ type: Date, default: null })
+  scheduledServiceDate: Date | null;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

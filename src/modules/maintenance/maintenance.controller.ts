@@ -53,11 +53,10 @@ export class MaintenanceController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new maintenance request' })
   create(@Req() req, @Body() dto: CreateMaintenanceDto) {
-    const userId = req.user.agencyId || req.user.userId;
     const agencyId = req.user.agencyId;
+    const userId = req.user.userId || req.user._id || agencyId;
     return this.maintenanceService.create(dto, userId, agencyId);
   }
-
 
   @Patch(':id/status')
   @ApiOperation({
@@ -70,7 +69,8 @@ export class MaintenanceController {
     @Param('id') id: string,
     @Body() dto: UpdateMaintenanceStatusDto,
   ) {
-    const userId = req.user.agencyId || req.user.userId;
+    const agencyId = req.user.agencyId;
+    const userId = req.user.userId || req.user._id || agencyId;
     const role = req.user.role;
 
     switch (dto.status) {
