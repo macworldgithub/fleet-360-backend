@@ -22,9 +22,9 @@ export class LogbookSession {
   @Prop({ type: Types.ObjectId, required: true })
   agencyId: Types.ObjectId;
 
-  /** Inclusive start date of the logbook period */
-  @Prop({ type: Date, required: true })
-  startDate: Date;
+  /** Inclusive start date of the logbook period (set from first trip) */
+  @Prop({ type: Date, required: false, default: null })
+  startDate: Date | null;
 
   /** Inclusive end date of the logbook period (null if session is live) */
   @Prop({ type: Date, required: false, default: null })
@@ -91,10 +91,10 @@ export const LogbookSessionSchema =
   SchemaFactory.createForClass(LogbookSession);
 
 /**
- * Compound index to enforce uniqueness and fast lookups
- * for sessions per vehicle within a date range.
+ * Partial unique index: only one DRAFT (active) session per vehicle.
+ * LOCKED sessions are excluded from the uniqueness constraint.
  */
 LogbookSessionSchema.index(
-  { vehicleId: 1, startDate: 1, endDate: 1 },
-  { unique: true },
+  { vehicleId: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'DRAFT' } },
 );

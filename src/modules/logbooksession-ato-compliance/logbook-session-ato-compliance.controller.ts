@@ -42,22 +42,6 @@ export class LogbookSessionAtoComplianceController {
     return this.service.createLogbookSession(dto, agencyId, userId);
   }
 
-  @Post(':id/lock')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Lock a logbook session',
-    description:
-      'Locks the session so no further edits can be made. ' +
-      'Requires the minimum ATO period to be satisfied.',
-  })
-  @ApiParam({ name: 'id', description: 'Logbook Session ID' })
-  lock(@Req() req, @Param('id') id: string) {
-    const agencyId = req.user.agencyId;
-    const userId = req.user.userId || req.user._id || agencyId;
-    return this.service.lockLogbookSession(id, userId, agencyId);
-  }
-
-
   @Get(':id')
   @ApiOperation({ summary: 'Get logbook session by ID' })
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
@@ -65,7 +49,6 @@ export class LogbookSessionAtoComplianceController {
     const agencyId = req.user.agencyId;
     return this.service.getSessionById(id, agencyId);
   }
-
 
   @Get('vehicle/:vehicleId')
   @ApiOperation({

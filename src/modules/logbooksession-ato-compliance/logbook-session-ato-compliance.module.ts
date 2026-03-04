@@ -8,12 +8,14 @@ import {
   LogbookSessionSchema,
 } from './schemas/logbook-session.schema';
 import { KmLog, KmLogSchema } from '../km-logs/schemas/km-log.schema';
+import { Vehicle, VehicleSchema } from '../vehicles/schemas/vehicle.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: LogbookSession.name, schema: LogbookSessionSchema },
       { name: KmLog.name, schema: KmLogSchema },
+      { name: Vehicle.name, schema: VehicleSchema },
     ]),
   ],
   controllers: [LogbookSessionAtoComplianceController],

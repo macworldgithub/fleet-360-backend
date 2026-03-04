@@ -17,11 +17,12 @@ export class CreateLogbookSessionDto {
 
   @ApiProperty({
     example: '2025-04-01',
-    description: 'Start date of the logbook period (inclusive)',
+    description: 'Start date of the logbook period (inclusive). Optional — auto-set from first trip.',
+    required: false,
   })
   @IsDateString()
-  @IsNotEmpty()
-  startDate: string;
+  @IsOptional()
+  startDate?: string;
 
   @ApiProperty({
     example: '2025-06-30',

@@ -20,6 +20,7 @@ import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
 import { AgenciesService } from '../../agencies/agencies.service';
 import { SubscriptionTier } from '../../agencies/schemas/agency.schema';
+import { LogbookSessionAtoComplianceService } from '../logbooksession-ato-compliance/logbook-session-ato-compliance.service';
 
 @Injectable()
 export class VehicleService {
@@ -31,6 +32,7 @@ export class VehicleService {
     @Inject(forwardRef(() => MaintenanceService))
     private readonly maintenanceService: MaintenanceService,
     private readonly agenciesService: AgenciesService,
+    private readonly logbookSessionService: LogbookSessionAtoComplianceService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -39,11 +41,23 @@ export class VehicleService {
     }
   }
 
+  /**
+   * Calculate Australian FBT year string (1 Apr – 31 Mar).
+   * e.g. date in Jul 2025 → "2025-2026", date in Feb 2026 → "2025-2026"
+   */
+  private calculateFbtYear(date: Date): string {
+    const month = date.getMonth(); // 0-indexed
+    const year = date.getFullYear();
+    return month >= 3
+      ? `${year}-${year + 1}`
+      : `${year - 1}-${year}`;
+  }
+
   async create(
     createVehicleDto: CreateVehicleDto,
     agencyId: string,
     userId: string,
-  ): Promise<VehicleDocument> {
+  ): Promise<{ vehicle: VehicleDocument; logbookSessionId: any }> {
     const vehicleData: any = {
       ...createVehicleDto,
       agencyId: new Types.ObjectId(agencyId),
@@ -88,7 +102,22 @@ export class VehicleService {
       userId,
     );
 
-    return saved;
+    // Auto-create a DRAFT logbook session for the new vehicle
+    const fbtYear = this.calculateFbtYear(new Date());
+
+    const newSession = await this.logbookSessionService.createLogbookSession(
+      {
+        vehicleId: saved._id.toString(),
+        fbtYear,
+      },
+      agencyId,
+      userId,
+    );
+
+    return {
+      vehicle: saved,
+      logbookSessionId: newSession._id,
+    };
   }
 
   async findAll(

@@ -121,6 +121,7 @@ export class KmLogsService {
       const isBusiness = dto.tripType === TripType.BUSINESS;
 
       // Update session totals
+      activeSession.endDate = new Date(dto.tripDate);
       activeSession.endOdometerInKms = dto.endOdometerInKms;
       activeSession.totalKms += distanceInKms;
 
@@ -145,6 +146,7 @@ export class KmLogsService {
 
       if (linkedTripsCount === 1) {
         activeSession.startOdometerInKms = dto.startOdometerInKms;
+        activeSession.startDate = new Date(dto.tripDate);
       }
 
       await activeSession.save();
@@ -278,11 +280,13 @@ export class KmLogsService {
           .sort({ tripDate: -1, createdAt: -1 })
           .exec();
 
-        // Update session's end odometer
+        // Update session's end odometer and end date
         if (sessionLatestTrip) {
+          session.endDate = sessionLatestTrip.tripDate;
           session.endOdometerInKms = sessionLatestTrip.endOdometerInKms;
         } else {
-          // No trips left in session, roll back to session's start odometer
+          // No trips left in session, roll back to session's start date/odometer
+          session.endDate = session.startDate;
           session.endOdometerInKms = session.startOdometerInKms;
         }
 

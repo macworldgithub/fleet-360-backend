@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +16,7 @@ import {
   KmLogDocument,
 } from '../km-logs/schemas/km-log.schema';
 import { CreateLogbookSessionDto } from './dto/create-logbook-session.dto';
+import { Vehicle, VehicleDocument } from '../vehicles/schemas/vehicle.schema';
 
 /** ATO minimum continuous logbook period: 12 weeks = 84 days */
 const ATO_MIN_PERIOD_DAYS = 84;
@@ -28,6 +28,8 @@ export class LogbookSessionAtoComplianceService {
     private readonly sessionModel: Model<LogbookSessionDocument>,
     @InjectModel(KmLog.name)
     private readonly kmLogModel: Model<KmLogDocument>,
+    @InjectModel(Vehicle.name)
+    private readonly vehicleModel: Model<VehicleDocument>,
   ) {}
 
   // ─── helpers ──────────────────────────────────────────────────────────
@@ -60,53 +62,41 @@ export class LogbookSessionAtoComplianceService {
     const vehicleOid = new Types.ObjectId(dto.vehicleId);
     const agencyOid = new Types.ObjectId(agencyId);
 
-    const startDate = new Date(dto.startDate);
+    // ── Fetch vehicle to get start odometer ──
+    const vehicle = await this.vehicleModel.findById(vehicleOid).exec();
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found.');
+    }
+
+    const startDate = dto.startDate ? new Date(dto.startDate) : null;
     const endDate = dto.endDate ? new Date(dto.endDate) : null;
 
-    if (endDate && endDate <= startDate) {
+    if (startDate && endDate && endDate <= startDate) {
       throw new BadRequestException('endDate must be after startDate');
     }
 
-    // ── Prevent overlapping sessions for the same vehicle ──
-    const overlappingQuery: any = {
-      vehicleId: vehicleOid,
-      $or: [
-        // Existing session that is still open (no endDate)
-        { endDate: null },
-        // Existing session that overlaps with the new range
-        {
-          startDate: { $lte: endDate || new Date() },
-          endDate: { $gte: startDate },
+    // ── Auto-lock any existing DRAFT session for this vehicle ──
+    await this.sessionModel.updateOne(
+      { vehicleId: vehicleOid, status: LogbookSessionStatus.DRAFT },
+      {
+        $set: {
+          status: LogbookSessionStatus.LOCKED,
+          endDate: new Date(),
+          isLocked: true,
+          lockedAt: new Date(),
         },
-      ],
-    };
+      },
+    );
 
-    // If starting a live session, just check for any existing open sessions
-    if (!endDate) {
-      delete overlappingQuery.$or;
-      overlappingQuery.endDate = null;
-    }
-
-    const overlapping = await this.sessionModel
-      .findOne(overlappingQuery)
-      .lean()
-      .exec();
-
-    if (overlapping) {
-      throw new ConflictException(
-        'An overlapping or active logbook session already exists for this vehicle.',
-      );
-    }
-
-    const periodDays = endDate ? this.daysBetween(startDate, endDate) : 0;
+    const periodDays = startDate && endDate ? this.daysBetween(startDate, endDate) : 0;
     const minimumPeriodSatisfied = periodDays >= ATO_MIN_PERIOD_DAYS;
 
     const session = await this.sessionModel.create({
       vehicleId: vehicleOid,
       agencyId: agencyOid,
       startDate,
-      endDate,
-      startOdometerInKms: 0,
+      endDate: null,
+      startOdometerInKms: vehicle.odometerInKms || 0,
       endOdometerInKms: null,
       totalKms: 0,
       businessKms: 0,
@@ -121,67 +111,6 @@ export class LogbookSessionAtoComplianceService {
       isValidForFbt: false,
     });
 
-    return session;
-  }
-
-  // ─── lockLogbookSession ──────────────────────────────────────────────
-
-  async lockLogbookSession(sessionId: string, userId: string, agencyId: string) {
-    this.validateObjectId(sessionId, 'sessionId');
-    this.validateObjectId(userId, 'userId');
-    this.validateObjectId(agencyId, 'agencyId');
-
-    const session = await this.sessionModel
-      .findOne({
-        _id: new Types.ObjectId(sessionId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
-      .exec();
-
-    if (!session) {
-      throw new NotFoundException('Logbook session not found.');
-    }
-
-    if (session.isLocked) {
-      throw new BadRequestException('This logbook session is already locked.');
-    }
-
-    // When locking, we finalize the endDate if it was live
-    if (!session.endDate) {
-      const lastTrip = await this.kmLogModel
-        .findOne({ logbookSessionId: session._id })
-        .sort({ tripDate: -1 })
-        .exec();
-
-      if (!lastTrip) {
-        throw new BadRequestException('Cannot lock an empty logbook session.');
-      }
-
-      session.endDate = lastTrip.tripDate;
-      session.endOdometerInKms = lastTrip.endOdometerInKms;
-
-      const periodDays = this.daysBetween(session.startDate, session.endDate);
-      session.minimumPeriodSatisfied = periodDays >= ATO_MIN_PERIOD_DAYS;
-    }
-
-    if (!session.minimumPeriodSatisfied) {
-      throw new BadRequestException(
-        'Cannot lock a session that does not satisfy the ATO minimum period of 12 continuous weeks.',
-      );
-    }
-
-    const userOid = new Types.ObjectId(userId);
-
-    session.status = LogbookSessionStatus.LOCKED;
-    session.isLocked = true;
-    session.lockedAt = new Date();
-    session.lockedBy = userOid;
-
-    // ATO validity check at the moment of locking
-    session.isValidForFbt =
-      session.minimumPeriodSatisfied && session.businessKms > 0;
-
-    await session.save();
     return session;
   }
 

@@ -6,6 +6,7 @@ import { VehicleService } from './vehicle.service';
 import { VehicleController } from './vehicle.controller';
 import { MaintenanceModule } from '../maintenance/maintenance.module';
 import { AgenciesModule } from '../../agencies/agencies.module';
+import { LogbookSessionAtoComplianceModule } from '../logbooksession-ato-compliance/logbook-session-ato-compliance.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AgenciesModule } from '../../agencies/agencies.module';
     ]),
     forwardRef(() => MaintenanceModule),
     AgenciesModule,
+    LogbookSessionAtoComplianceModule,
   ],
   controllers: [VehicleController],
   providers: [VehicleService],
