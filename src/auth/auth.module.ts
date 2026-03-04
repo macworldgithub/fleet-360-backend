@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { UsersModule } from '../users/users.module';
 import { DriverModule } from '../modules/drivers/driver.module';
 import { AgenciesModule } from '../agencies/agencies.module';
+import { AwsModule } from '../aws/aws.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -12,6 +13,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     UsersModule,
     DriverModule,
     AgenciesModule,
+    AwsModule,
     JwtModule.register({}), // config handled manually in service
   ],
   controllers: [AuthController],

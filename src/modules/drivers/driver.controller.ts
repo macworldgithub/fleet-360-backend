@@ -11,8 +11,11 @@ import {
   Post,
   Body,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiConsumes, ApiParam } from '@nestjs/swagger';
 import { DriverService } from './driver.service';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -46,15 +49,27 @@ export class DriverController {
     return this.driverService.findOne(driverId, agencyId);
   }
 
+  @Get(':driverId/profile-picture')
+  @ApiOperation({ summary: 'Get signed URL for driver profile picture' })
+  @ApiParam({ name: 'driverId', description: 'Driver ID' })
+  async getProfilePicture(@Req() req, @Param('driverId') driverId: string) {
+    const agencyId = req.user.agencyId;
+    const url = await this.driverService.getProfilePictureUrl(driverId, agencyId);
+    return { url };
+  }
+
   @Patch(':driverId')
-  @ApiOperation({ summary: 'Update a driver by ID' })
+  @ApiOperation({ summary: 'Update a driver by ID (with optional profile picture)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('profilePicture'))
   update(
     @Req() req,
     @Param('driverId') driverId: string,
     @Body() updateDriverDto: UpdateDriverDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     const agencyId = req.user.agencyId;
-    return this.driverService.update(driverId, updateDriverDto, agencyId);
+    return this.driverService.update(driverId, updateDriverDto, agencyId, file);
   }
 
   @Delete(':driverId')

@@ -50,4 +50,8 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   agencyName?: string;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  profilePicture?: any;
 }
