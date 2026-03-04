@@ -6,12 +6,10 @@ export type LogbookSessionDocument = LogbookSession & Document;
 /**
  * ATO Logbook Session Status.
  * DRAFT   – session is being built / editable
- * SUBMITTED – session submitted for review
  * LOCKED  – session finalised; no further edits allowed
  */
 export enum LogbookSessionStatus {
   DRAFT = 'DRAFT',
-  SUBMITTED = 'SUBMITTED',
   LOCKED = 'LOCKED',
 }
 

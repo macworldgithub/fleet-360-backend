@@ -18,7 +18,6 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { LogbookSessionAtoComplianceService } from './logbook-session-ato-compliance.service';
 import { CreateLogbookSessionDto } from './dto/create-logbook-session.dto';
-import { LockLogbookSessionDto } from './dto/lock-logbook-session.dto';
 
 @ApiTags('Logbook Sessions (ATO Compliance)')
 @ApiBearerAuth()
@@ -58,17 +57,6 @@ export class LogbookSessionAtoComplianceController {
     return this.service.lockLogbookSession(id, userId, agencyId);
   }
 
-  @Get(':id/audits')
-  @ApiOperation({
-    summary: 'Get audit trail for a logbook session',
-    description:
-      'Returns all audit records (CREATE, LOCK) for a session, sorted by most recent first.',
-  })
-  @ApiParam({ name: 'id', description: 'Logbook Session ID' })
-  getAudits(@Req() req, @Param('id') id: string) {
-    const agencyId = req.user.agencyId;
-    return this.service.getAuditsBySession(id, agencyId);
-  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get logbook session by ID' })
@@ -78,17 +66,6 @@ export class LogbookSessionAtoComplianceController {
     return this.service.getSessionById(id, agencyId);
   }
 
-  @Get('live/:vehicleId')
-  @ApiOperation({
-    summary: 'Get live logbook summary for a vehicle',
-    description:
-      'Returns the current active (unlocked) session with real-time totals and trip list.',
-  })
-  @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
-  getLiveSummary(@Req() req, @Param('vehicleId') vehicleId: string) {
-    const agencyId = req.user.agencyId;
-    return this.service.getLiveSummary(vehicleId, agencyId);
-  }
 
   @Get('vehicle/:vehicleId')
   @ApiOperation({

@@ -4,8 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 
 import {
   LogbookSession,
@@ -13,14 +13,8 @@ import {
   LogbookSessionStatus,
 } from './schemas/logbook-session.schema';
 import {
-  ComplianceAudit,
-  ComplianceAuditDocument,
-  AuditAction,
-} from './schemas/compliance-audit.schema';
-import {
   KmLog,
   KmLogDocument,
-  TripType,
 } from '../km-logs/schemas/km-log.schema';
 import { CreateLogbookSessionDto } from './dto/create-logbook-session.dto';
 
@@ -32,12 +26,8 @@ export class LogbookSessionAtoComplianceService {
   constructor(
     @InjectModel(LogbookSession.name)
     private readonly sessionModel: Model<LogbookSessionDocument>,
-    @InjectModel(ComplianceAudit.name)
-    private readonly auditModel: Model<ComplianceAuditDocument>,
     @InjectModel(KmLog.name)
     private readonly kmLogModel: Model<KmLogDocument>,
-    @InjectConnection()
-    private readonly connection: Connection,
   ) {}
 
   // ─── helpers ──────────────────────────────────────────────────────────
@@ -69,7 +59,6 @@ export class LogbookSessionAtoComplianceService {
 
     const vehicleOid = new Types.ObjectId(dto.vehicleId);
     const agencyOid = new Types.ObjectId(agencyId);
-    const performedByOid = new Types.ObjectId(performedBy);
 
     const startDate = new Date(dto.startDate);
     const endDate = dto.endDate ? new Date(dto.endDate) : null;
@@ -109,68 +98,30 @@ export class LogbookSessionAtoComplianceService {
       );
     }
 
-    // Odometer and Kms start at zero for a 'Clean' session
-    const startOdometerInKms = 0; // Will be set by the first trip
-    const endOdometerInKms = null;
-    const totalKms = 0;
-    const businessKms = 0;
-    const privateKms = 0;
-    const businessUsePercentage = 0;
-
     const periodDays = endDate ? this.daysBetween(startDate, endDate) : 0;
     const minimumPeriodSatisfied = periodDays >= ATO_MIN_PERIOD_DAYS;
-    const isValidForFbt = false; // Initially false for an empty session
 
-    const transactionSession = await this.connection.startSession();
-    transactionSession.startTransaction();
+    const session = await this.sessionModel.create({
+      vehicleId: vehicleOid,
+      agencyId: agencyOid,
+      startDate,
+      endDate,
+      startOdometerInKms: 0,
+      endOdometerInKms: null,
+      totalKms: 0,
+      businessKms: 0,
+      privateKms: 0,
+      businessUsePercentage: 0,
+      minimumPeriodSatisfied,
+      status: LogbookSessionStatus.DRAFT,
+      isLocked: false,
+      lockedAt: null,
+      lockedBy: null,
+      fbtYear: dto.fbtYear,
+      isValidForFbt: false,
+    });
 
-    try {
-      const [session] = await this.sessionModel.create(
-        [
-          {
-            vehicleId: vehicleOid,
-            agencyId: agencyOid,
-            startDate,
-            endDate,
-            startOdometerInKms,
-            endOdometerInKms,
-            totalKms,
-            businessKms,
-            privateKms,
-            businessUsePercentage,
-            minimumPeriodSatisfied,
-            status: LogbookSessionStatus.DRAFT,
-            isLocked: false,
-            lockedAt: null,
-            lockedBy: null,
-            fbtYear: dto.fbtYear,
-            isValidForFbt,
-          },
-        ],
-        { session: transactionSession },
-      );
-
-      await this.auditModel.create(
-        [
-          {
-            sessionId: session._id,
-            action: AuditAction.CREATE,
-            performedBy: performedByOid,
-            previousValue: null,
-            newValue: session.toObject(),
-          },
-        ],
-        { session: transactionSession },
-      );
-
-      await transactionSession.commitTransaction();
-      return session;
-    } catch (error) {
-      await transactionSession.abortTransaction();
-      throw error;
-    } finally {
-      transactionSession.endSession();
-    }
+    return session;
   }
 
   // ─── lockLogbookSession ──────────────────────────────────────────────
@@ -219,77 +170,19 @@ export class LogbookSessionAtoComplianceService {
       );
     }
 
-    const oldStatus = session.status;
     const userOid = new Types.ObjectId(userId);
 
-    const transactionSession = await this.connection.startSession();
-    transactionSession.startTransaction();
+    session.status = LogbookSessionStatus.LOCKED;
+    session.isLocked = true;
+    session.lockedAt = new Date();
+    session.lockedBy = userOid;
 
-    try {
-      session.status = LogbookSessionStatus.LOCKED;
-      session.isLocked = true;
-      session.lockedAt = new Date();
-      session.lockedBy = userOid;
+    // ATO validity check at the moment of locking
+    session.isValidForFbt =
+      session.minimumPeriodSatisfied && session.businessKms > 0;
 
-      // ATO validity check at the moment of locking
-      session.isValidForFbt =
-        session.minimumPeriodSatisfied && session.businessKms > 0;
-
-      await session.save({ session: transactionSession });
-
-      await this.auditModel.create(
-        [
-          {
-            sessionId: session._id,
-            action: AuditAction.LOCK,
-            performedBy: userOid,
-            previousValue: { status: oldStatus },
-            newValue: { status: LogbookSessionStatus.LOCKED },
-          },
-        ],
-        { session: transactionSession },
-      );
-
-      await transactionSession.commitTransaction();
-      return session;
-    } catch (error) {
-      await transactionSession.abortTransaction();
-      throw error;
-    } finally {
-      transactionSession.endSession();
-    }
-  }
-
-  async getLiveSummary(vehicleId: string, agencyId: string) {
-    this.validateObjectId(vehicleId, 'vehicleId');
-    this.validateObjectId(agencyId, 'agencyId');
-
-    const session = await this.sessionModel
-      .findOne({
-        vehicleId: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-        isLocked: false,
-      })
-      .lean()
-      .exec();
-
-    if (!session) {
-      throw new NotFoundException(
-        'No active logbook session found for this vehicle.',
-      );
-    }
-
-    const trips = await this.kmLogModel
-      .find({ logbookSessionId: (session as any)._id })
-      .sort({ tripDate: -1 })
-      .lean()
-      .exec();
-
-    return {
-      session,
-      trips,
-      tripCount: trips.length,
-    };
+    await session.save();
+    return session;
   }
 
   // ─── getSessionById ──────────────────────────────────────────────────
@@ -325,27 +218,6 @@ export class LogbookSessionAtoComplianceService {
         agencyId: new Types.ObjectId(agencyId),
       })
       .sort({ startDate: -1 })
-      .lean()
-      .exec();
-  }
-
-  // ─── getAuditsBySession ───────────────────────────────────────────────
-
-  async getAuditsBySession(sessionId: string, agencyId: string) {
-    this.validateObjectId(sessionId, 'sessionId');
-    this.validateObjectId(agencyId, 'agencyId');
-
-    // Verify session ownership first
-    const session = await this.sessionModel.findOne({
-      _id: new Types.ObjectId(sessionId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
-
-    if (!session) throw new NotFoundException('Session not found');
-
-    return this.auditModel
-      .find({ sessionId: new Types.ObjectId(sessionId) })
-      .sort({ createdAt: -1 })
       .lean()
       .exec();
   }

@@ -7,17 +7,12 @@ import {
   LogbookSession,
   LogbookSessionSchema,
 } from './schemas/logbook-session.schema';
-import {
-  ComplianceAudit,
-  ComplianceAuditSchema,
-} from './schemas/compliance-audit.schema';
 import { KmLog, KmLogSchema } from '../km-logs/schemas/km-log.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: LogbookSession.name, schema: LogbookSessionSchema },
-      { name: ComplianceAudit.name, schema: ComplianceAuditSchema },
       { name: KmLog.name, schema: KmLogSchema },
     ]),
   ],
