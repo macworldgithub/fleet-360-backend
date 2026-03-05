@@ -18,6 +18,9 @@ import {
 import { CreateKmLogDto } from './dto/create-km-log.dto';
 import { UpdateKmLogDto } from './dto/update-km-log.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
+import { AwsService } from 'src/aws/aws.service';
+import { v4 as uuid } from 'uuid';
+import * as path from 'path';
 
 @Injectable()
 export class KmLogsService {
@@ -29,6 +32,7 @@ export class KmLogsService {
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
     private readonly maintenanceService: MaintenanceService,
+    private readonly awsService: AwsService,
   ) {}
 
   private validateObjectId(id: string, label: string) {
@@ -59,7 +63,27 @@ export class KmLogsService {
     return null;
   }
 
-  async create(dto: CreateKmLogDto, agencyId: string) {
+  private async getLogWithSignedUrls(log: KmLogDocument) {
+    const logObj = log.toObject();
+    if (logObj.startOdometerPhoto) {
+      logObj['startOdometerPhotoUrl'] = await this.awsService.getSignedUrl(
+        logObj.startOdometerPhoto,
+      );
+    }
+    if (logObj.endOdometerPhoto) {
+      logObj['endOdometerPhotoUrl'] = await this.awsService.getSignedUrl(
+        logObj.endOdometerPhoto,
+      );
+    }
+    return logObj;
+  }
+
+  async create(
+    dto: CreateKmLogDto,
+    agencyId: string,
+    startPhoto: Express.Multer.File,
+    endPhoto: Express.Multer.File,
+  ) {
     this.validateObjectId(dto.vehicleId, 'vehicleId');
     this.validateObjectId(agencyId, 'agencyId');
 
@@ -104,6 +128,22 @@ export class KmLogsService {
       businessPurpose: dto.businessPurpose ?? null,
       logbookSessionId: activeSession ? activeSession._id : null,
     };
+
+    // ── 3. Upload odometer photos to S3 ──
+    const startPhotoKey = await this.awsService.uploadFile(
+      startPhoto.buffer,
+      `${agencyId}/km-logs/${dto.vehicleId}/start-${uuid()}${path?.extname(startPhoto.originalname) || ''}`,
+      startPhoto.mimetype,
+    );
+
+    const endPhotoKey = await this.awsService.uploadFile(
+      endPhoto.buffer,
+      `${agencyId}/km-logs/${dto.vehicleId}/end-${uuid()}${path?.extname(endPhoto.originalname) || ''}`,
+      endPhoto.mimetype,
+    );
+
+    payload.startOdometerPhoto = startPhotoKey;
+    payload.endOdometerPhoto = endPhotoKey;
 
     if (dto.officeId) {
       this.validateObjectId(dto.officeId, 'officeId');
@@ -191,7 +231,8 @@ export class KmLogsService {
       if (filters.toDate) query.tripDate.$lte = new Date(filters.toDate);
     }
 
-    return this.kmLogModel.find(query).sort({ tripDate: -1 }).exec();
+    const logs = await this.kmLogModel.find(query).sort({ tripDate: -1 }).exec();
+    return Promise.all(logs.map((log) => this.getLogWithSignedUrls(log)));
   }
 
   async findOne(logId: string, agencyId: string) {
@@ -204,10 +245,16 @@ export class KmLogsService {
 
     if (!log) throw new NotFoundException('KM Log not found');
 
-    return log;
+    return this.getLogWithSignedUrls(log);
   }
 
-  async update(logId: string, dto: UpdateKmLogDto, agencyId: string) {
+  async update(
+    logId: string,
+    dto: UpdateKmLogDto,
+    agencyId: string,
+    startPhoto?: Express.Multer.File,
+    endPhoto?: Express.Multer.File,
+  ) {
     this.validateObjectId(logId, 'logId');
 
     const existing = await this.kmLogModel.findOne({
@@ -224,15 +271,45 @@ export class KmLogsService {
 
     const distanceInKms = this.calculateDistance(start, end);
 
+    const updatePayload: any = {
+      ...dto,
+      tripDate: dto.tripDate ? new Date(dto.tripDate) : existing.tripDate,
+      distanceInKms,
+    };
+
+    // If new start photo provided
+    if (startPhoto) {
+      const startPhotoKey = await this.awsService.uploadFile(
+        startPhoto.buffer,
+        `${agencyId}/km-logs/${existing.vehicleId}/start-${uuid()}${path.extname(startPhoto.originalname)}`,
+        startPhoto.mimetype,
+      );
+      // Delete old photo if it exists
+      if (existing.startOdometerPhoto) {
+        await this.awsService.deleteFile(existing.startOdometerPhoto);
+      }
+      updatePayload.startOdometerPhoto = startPhotoKey;
+    }
+
+    // If new end photo provided
+    if (endPhoto) {
+      const endPhotoKey = await this.awsService.uploadFile(
+        endPhoto.buffer,
+        `${agencyId}/km-logs/${existing.vehicleId}/end-${uuid()}${path.extname(endPhoto.originalname)}`,
+        endPhoto.mimetype,
+      );
+      // Delete old photo if it exists
+      if (existing.endOdometerPhoto) {
+        await this.awsService.deleteFile(existing.endOdometerPhoto);
+      }
+      updatePayload.endOdometerPhoto = endPhotoKey;
+    }
+
     const updated = await this.kmLogModel
       .findOneAndUpdate(
         { _id: new Types.ObjectId(logId), agencyId: new Types.ObjectId(agencyId) },
         {
-          $set: {
-            ...dto,
-            tripDate: dto.tripDate ? new Date(dto.tripDate) : existing.tripDate,
-            distanceInKms,
-          },
+          $set: updatePayload,
         },
         { new: true },
       )
@@ -246,7 +323,11 @@ export class KmLogsService {
       ).exec();
     }
 
-    return updated;
+    if (!updated) {
+      throw new NotFoundException('KM Log not found after update');
+    }
+
+    return this.getLogWithSignedUrls(updated);
   }
 
   async remove(logId: string, agencyId: string) {
@@ -259,6 +340,14 @@ export class KmLogsService {
 
     if (!deleted) {
       throw new NotFoundException('KM Log not found');
+    }
+
+    // ── 0. Delete photos from S3 ──
+    if (deleted.startOdometerPhoto) {
+      await this.awsService.deleteFile(deleted.startOdometerPhoto).catch(e => console.error('Error deleting start photo from S3', e));
+    }
+    if (deleted.endOdometerPhoto) {
+      await this.awsService.deleteFile(deleted.endOdometerPhoto).catch(e => console.error('Error deleting end photo from S3', e));
     }
 
     // ── 1. Revert Logbook Session Totals ──
