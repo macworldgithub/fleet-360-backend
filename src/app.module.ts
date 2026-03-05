@@ -15,6 +15,7 @@ import { IncidentModule } from './modules/incidents/incident.module';
 import { AwsModule } from './aws/aws.module';
 import { FuelModule } from './modules/fuel/fuel.module';
 import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelligence.module';
+import { BillingModule } from './modules/billings/billing.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelli
     FuelModule,
     CostIntelligenceModule,
     AwsModule,
+    BillingModule
   ],
 })
 export class AppModule {}
