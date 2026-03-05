@@ -98,4 +98,13 @@ export class VehicleController {
     const agencyId = req.user.agencyId;
     return this.vehicleService.makeLoanRepayment(vehicleId, dto.amount, agencyId);
   }
+
+  @Get(':vehicleId/loan-history')
+  @ApiOperation({
+    summary: 'Get loan repayment history for a vehicle',
+  })
+  getLoanHistory(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    return this.vehicleService.getLoanRepaymentHistory(vehicleId, agencyId);
+  }
 }

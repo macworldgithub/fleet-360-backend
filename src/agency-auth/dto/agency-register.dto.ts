@@ -7,7 +7,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { AgencyRole } from '../../agencies/schemas/agency.schema';
+import { AgencyRole, SubscriptionTier } from '../../agencies/schemas/agency.schema';
 
 export class AgencyRegisterDto {
   @ApiProperty({ example: 'Fleet Masters Pty Ltd' })
@@ -61,4 +61,12 @@ export class AgencyRegisterDto {
   @IsOptional()
   @IsString()
   city?: string;
+
+  @ApiPropertyOptional({
+    enum: SubscriptionTier,
+    example: SubscriptionTier.ESSENTIAL,
+  })
+  @IsOptional()
+  @IsEnum(SubscriptionTier)
+  subscriptionTier?: SubscriptionTier;
 }

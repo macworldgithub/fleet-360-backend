@@ -287,7 +287,24 @@ export class VehicleService {
       );
     }
 
-    vehicle.loanAmount = vehicle.loanAmount - amount;
+    const newBalance = vehicle.loanAmount - amount;
+
+    // Record the history
+    vehicle.loanRepaymentHistory.push({
+      amount,
+      paymentDate: new Date(),
+      remainingBalance: newBalance,
+    });
+
+    vehicle.loanAmount = newBalance;
     return vehicle.save();
+  }
+
+  async getLoanRepaymentHistory(
+    vehicleId: string,
+    agencyId: string,
+  ): Promise<any[]> {
+    const vehicle = await this.findOne(vehicleId, agencyId);
+    return vehicle.loanRepaymentHistory || [];
   }
 }

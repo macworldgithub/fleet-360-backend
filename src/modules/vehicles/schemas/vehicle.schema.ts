@@ -126,6 +126,22 @@ export class Vehicle {
 
   @Prop({ type: Date, default: null })
   scheduledServiceDate: Date | null;
+
+  @Prop({
+    type: [
+      {
+        amount: { type: Number, required: true },
+        paymentDate: { type: Date, default: Date.now },
+        remainingBalance: { type: Number },
+      },
+    ],
+    default: [],
+  })
+  loanRepaymentHistory: {
+    amount: number;
+    paymentDate: Date;
+    remainingBalance: number;
+  }[];
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

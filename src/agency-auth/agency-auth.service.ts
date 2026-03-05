@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AgencyRegisterDto } from './dto/agency-register.dto';
 import { AgencyLoginDto } from './dto/agency-login.dto';
+import { SubscriptionTier } from '../agencies/schemas/agency.schema';
 
 @Injectable()
 export class AgencyAuthService {
@@ -61,6 +62,7 @@ export class AgencyAuthService {
       city: dto.city ?? undefined,
       password: dto.password,
       role: dto.role,
+      subscriptionTier: dto.subscriptionTier || SubscriptionTier.ESSENTIAL,
     });
 
     return {
