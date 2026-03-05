@@ -27,7 +27,7 @@ export class IncidentService {
     agencyId: string,
     vehicleId: string,
     dto: CreateIncidentDto,
-    files?: Express.Multer.File[],
+    evidencePhotos?: Express.Multer.File[],
   ) {
     if (!Types.ObjectId.isValid(agencyId))
       throw new BadRequestException('Invalid agencyId');
@@ -51,10 +51,10 @@ export class IncidentService {
     });
 
     // Upload photos to S3 if provided
-    if (files && files.length > 0) {
+    if (evidencePhotos && evidencePhotos.length > 0) {
       const uploadedKeys: string[] = [];
 
-      for (const file of files) {
+      for (const file of evidencePhotos) {
         const ext = extname(file.originalname).toLowerCase();
         const key = `${agencyId}/incidents/${incident._id}/${uuidv4()}${ext}`;
         await this.awsService.uploadFile(file.buffer, key, file.mimetype);
@@ -117,13 +117,13 @@ export class IncidentService {
   async addPhotos(
     id: string,
     agencyId: string,
-    files: Express.Multer.File[],
+    evidencePhotos: Express.Multer.File[],
   ): Promise<IncidentDocument> {
     const incident = await this.findOne(id, agencyId);
 
     const uploadedKeys: string[] = [];
 
-    for (const file of files) {
+    for (const file of evidencePhotos) {
       const ext = extname(file.originalname).toLowerCase();
       const key = `${agencyId}/incidents/${incident._id}/${uuidv4()}${ext}`;
       await this.awsService.uploadFile(file.buffer, key, file.mimetype);

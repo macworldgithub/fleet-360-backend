@@ -49,7 +49,7 @@ export class IncidentController {
   @ApiOperation({ summary: 'Create Incident (with optional photo uploads)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
-    FilesInterceptor('photos', 5, {
+    FilesInterceptor('evidencePhotos', 5, {
       limits: { fileSize: MAX_FILE_SIZE },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
@@ -68,10 +68,10 @@ export class IncidentController {
     @Req() req,
     @Query('vehicleId') vehicleId: string,
     @Body() dto: CreateIncidentDto,
-    @UploadedFiles() files?: Express.Multer.File[],
+    @UploadedFiles() evidencePhotos?: Express.Multer.File[],
   ) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.create(agencyId, vehicleId, dto, files);
+    return this.incidentService.create(agencyId, vehicleId, dto, evidencePhotos);
   }
 
   @Get()
@@ -106,7 +106,7 @@ export class IncidentController {
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'incidentId', description: 'Incident ObjectId' })
   @UseInterceptors(
-    FilesInterceptor('photos', 5, {
+    FilesInterceptor('evidencePhotos', 5, {
       limits: { fileSize: MAX_FILE_SIZE },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
@@ -124,13 +124,13 @@ export class IncidentController {
   addPhotos(
     @Req() req,
     @Param('incidentId') id: string,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles() evidencePhotos: Express.Multer.File[],
   ) {
     const agencyId = req.user.agencyId;
-    if (!files || files.length === 0) {
+    if (!evidencePhotos || evidencePhotos.length === 0) {
       throw new BadRequestException('At least one photo file is required');
     }
-    return this.incidentService.addPhotos(id, agencyId, files);
+    return this.incidentService.addPhotos(id, agencyId, evidencePhotos);
   }
 
   @Delete(':incidentId/photos/:photoKey')

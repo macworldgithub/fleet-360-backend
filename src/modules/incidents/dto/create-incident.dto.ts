@@ -53,4 +53,7 @@ export class CreateIncidentDto {
   @IsOptional()
   @IsEnum(IncidentStatus)
   status?: IncidentStatus;
+
+  @ApiPropertyOptional({ type: 'array', items: { type: 'string', format: 'binary' }, description: 'Incident evidence photos (max 5)' })
+  evidencePhotos?: any[];
 }
