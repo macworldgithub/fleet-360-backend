@@ -13,10 +13,10 @@ import { Invoice, InvoiceSchema } from './invoices/invoice.schema';
 import { PlansController } from './plans/plans.controller';
 import { PaymentsController } from './payments/payments.controller';
 import { InvoicesController } from './invoices/invoices.controller';
-import { StripeController } from './stripe/stripe.controller';
 import { PlansService } from './plans/plans.service';
 import { PaymentsService } from './payments/payments.service';
 import { InvoicesService } from './invoices/invoices.service';
+import { StripeWebhookController } from './stripe/stripe-webhook.controller';
 
 
 @Module({
@@ -37,7 +37,7 @@ import { InvoicesService } from './invoices/invoices.service';
     SubscriptionsController,
     PaymentsController,
     InvoicesController,
-    StripeController,
+    StripeWebhookController,
   ],
 
   providers: [

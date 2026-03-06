@@ -1,41 +1,51 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Subscription, SubscriptionDocument, BillingCycle } from './subscription.schema';
+import { Subscription, SubscriptionDocument, BillingCycle, SubscriptionStatus } from './subscription.schema';
 import { CreateSubscriptionDto } from './create-subscription.dto';
+import { PlansService } from '../plans/plans.service';
 import { StripeService } from '../stripe/stripe.service';
-import { Plan, PlanDocument } from '../plans/plan.schema';
 
 @Injectable()
 export class SubscriptionsService {
   constructor(
     @InjectModel(Subscription.name) private subModel: Model<SubscriptionDocument>,
-    @InjectModel(Plan.name) private planModel: Model<PlanDocument>,
+    private plansService: PlansService,
     private stripeService: StripeService
   ) {}
 
-  async create(dto: CreateSubscriptionDto): Promise<Subscription> {
-    const plan = await this.planModel.findById(dto.planId);
+  async create(dto: CreateSubscriptionDto) {
+    // Find plan
+    const plan = await this.plansService.findOne(dto.planId);
+
     if (!plan) throw new NotFoundException('Plan not found');
 
-    // 1️⃣ Create Stripe customer
-    const stripeCustomer = await this.stripeService.createCustomer('agency@example.com', 'Agency Name');
+    // Create Stripe customer (dummy email for testing)
+    const customer = await this.stripeService.createCustomer(
+  `agency-${dto.agencyId}@test.com`,
+  'pm_card_visa' // Stripe test payment method
+);
 
-    // 2️⃣ Get Stripe Price ID
-    const priceId = dto.billingCycle === BillingCycle.MONTHLY ? plan.stripePriceMonthlyId : plan.stripePriceYearlyId;
+    // Determine priceId
+    const priceId = dto.billingCycle === BillingCycle.MONTHLY
+      ? plan.stripePriceMonthlyId
+      : plan.stripePriceYearlyId;
 
-    // 3️⃣ Create Stripe subscription
-    const stripeSubscription = await this.stripeService.createSubscription(stripeCustomer.id, priceId);
+    // Create Stripe subscription
+    const stripeSub = await this.stripeService.createSubscription(customer.id, priceId);
 
-    // 4️⃣ Save in DB
+    // Save subscription in DB
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(startDate.getMonth() + (dto.billingCycle === BillingCycle.MONTHLY ? 1 : 12));
+
     const subscription = new this.subModel({
-      agencyId: dto.agencyId,
-      planId: dto.planId,
-      billingCycle: dto.billingCycle,
-      stripeCustomerId: stripeCustomer.id,
-      stripeSubscriptionId: stripeSubscription.id,
-      startDate: new Date(),
-      status: 'ACTIVE',
+      ...dto,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: stripeSub.id,
+      startDate,
+      endDate,
+      status: SubscriptionStatus.ACTIVE,
     });
 
     return subscription.save();
@@ -51,11 +61,18 @@ export class SubscriptionsService {
     return sub;
   }
 
-  async findByStripeId(stripeSubscriptionId: string) {
-  return this.subModel.findOne({ stripeSubscriptionId }).exec();
-}
+  async updateStatus(stripeSubscriptionId: string, status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED') {
+  const sub = await this.subModel.findOne({ stripeSubscriptionId });
+  if (!sub) {
+    console.warn(`Subscription not found: ${stripeSubscriptionId}`);
+    return;
+  }
 
-async findByCustomerId(stripeCustomerId: string) {
-  return this.subModel.findOne({ stripeCustomerId }).exec();
+  // Cast status string to enum type
+  sub.status = status as SubscriptionStatus;
+  await sub.save();
+}
+async findByStripeId(stripeSubscriptionId: string) {
+  return this.subModel.findOne({ stripeSubscriptionId }).exec();
 }
 }

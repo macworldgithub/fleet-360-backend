@@ -6,19 +6,41 @@ import { Payment, PaymentDocument, PaymentStatus } from './payment.schema';
 
 @Injectable()
 export class PaymentsService {
-  constructor(@InjectModel(Payment.name) private payModel: Model<PaymentDocument>) {}
+  constructor(
+    @InjectModel(Payment.name) private payModel: Model<PaymentDocument>,
+  ) {}
 
   async create(paymentData: Partial<Payment>): Promise<Payment> {
     const payment = new this.payModel(paymentData);
     return payment.save();
   }
 
-  async findAll(): Promise<Payment[]> {
-    return this.payModel.find().exec();
+  async findAllWithSubscription(): Promise<Payment[]> {
+    return this.payModel
+      .find()
+      .populate({
+        path: 'subscriptionId',      
+        populate: [
+          { path: 'planId' },        
+          { path: 'agencyId' },      
+        ],
+      })
+      .exec();
   }
 
-  async findOne(id: string): Promise<Payment | null> { return this.payModel.findById(id).exec(); }
-  
+  async findOneWithSubscription(id: string): Promise<Payment | null> {
+    return this.payModel
+      .findById(id)
+      .populate({
+        path: 'subscriptionId',
+        populate: [
+          { path: 'planId' },
+          { path: 'agencyId' },
+        ],
+      })
+      .exec();
+  }
+
   async findByStripePaymentIntent(intentId: string) {
     return this.payModel.findOne({ stripePaymentIntentId: intentId }).exec();
   }

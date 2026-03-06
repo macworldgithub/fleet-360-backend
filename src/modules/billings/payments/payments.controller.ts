@@ -1,3 +1,4 @@
+// payments.controller.ts
 import { Controller, Get, Param } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
@@ -7,11 +8,11 @@ export class PaymentsController {
 
   @Get()
   findAll() {
-    return this.paymentsService.findAll();
+    return this.paymentsService.findAllWithSubscription();
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.paymentsService.findOne(id);
+    return this.paymentsService.findOneWithSubscription(id);
   }
 }
