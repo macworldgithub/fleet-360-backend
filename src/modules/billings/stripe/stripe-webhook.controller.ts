@@ -4,12 +4,15 @@ import { StripeService } from './stripe.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
+import { PaymentsService } from '../payments/payments.service';
+import { PaymentStatus } from '../payments/payment.schema';
 
 @Controller('stripe/webhook')
 export class StripeWebhookController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly paymentsService: PaymentsService,
     private readonly configService: ConfigService
   ) {}
 
@@ -37,11 +40,59 @@ export class StripeWebhookController {
     try {
       // Handle different Stripe event types
       switch (event.type) {
-        case 'invoice.payment_succeeded': {
-          const subscriptionId = event.data.object['subscription'];
-          await this.subscriptionsService.updateStatus(subscriptionId, 'ACTIVE');
-          break;
-        }
+       case 'invoice.payment_succeeded': {
+  const invoice = event.data.object as Stripe.Invoice & {
+    parent?: { subscription_details?: { subscription?: string } };
+    payment_intent?: string | Stripe.PaymentIntent | null;
+  };
+
+  // Get subscription ID (handle first invoice edge case)
+  const stripeSubscriptionId =
+    (invoice as any).subscription ||
+    invoice.parent?.subscription_details?.subscription;
+
+  // Get payment intent ID safely
+  const stripePaymentIntentId =
+    typeof invoice.payment_intent === 'string'
+      ? invoice.payment_intent
+      : invoice.payment_intent?.id;
+
+  const amountPaid = invoice.amount_paid;
+  const currency = invoice.currency;
+
+  console.log(stripeSubscriptionId, "STRIPE SUBSCRIPTION ID");
+  console.log(stripePaymentIntentId, "STRIPE INTENT ID");
+  console.log(amountPaid, "AMOUNT PAID");
+  console.log(currency, "CURRENCY");
+
+  if (stripeSubscriptionId) {
+    // Update subscription status
+    await this.subscriptionsService.updateStatus(
+      stripeSubscriptionId,
+      'ACTIVE',
+    );
+
+    // Create payment record in DB
+    const subscription = await this.subscriptionsService.findByStripeId(stripeSubscriptionId);
+    if (subscription && stripePaymentIntentId) {
+      await this.paymentsService.create({
+        agencyId: subscription.agencyId,
+        subscriptionId: subscription._id,
+        amount: amountPaid / 100,
+        currency: currency.toUpperCase(),
+        status: PaymentStatus.SUCCESS,
+        stripePaymentIntentId: stripePaymentIntentId,
+        paidAt: new Date((invoice.created ?? Date.now() / 1000) * 1000),
+      });
+    }
+  } else {
+    console.warn(
+      'Received invoice.payment_succeeded without a subscription id on the invoice',
+      invoice,
+    );
+  }
+  break;
+}
         case 'invoice.payment_failed': {
           const subscriptionId = event.data.object['subscription'];
           await this.subscriptionsService.updateStatus(subscriptionId, 'PAST_DUE');
