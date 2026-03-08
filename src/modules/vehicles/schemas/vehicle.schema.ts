@@ -127,6 +127,12 @@ export class Vehicle {
   @Prop({ type: Date, default: null })
   scheduledServiceDate: Date | null;
 
+  @Prop({ required: true, trim: true })
+  displayPhoto: string;
+
+  @Prop({ type: [String], default: [] })
+  vehiclePhotos: string[];
+
   @Prop({
     type: [
       {

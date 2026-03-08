@@ -11,16 +11,22 @@ import {
   UseGuards,
   Query,
   Req,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { UpdateVehicleDto, UpdateVehiclePhotosDto } from './dto/update-vehicle.dto';
+import { RemoveVehiclePhotosDto } from './dto/remove-vehicle-photos.dto';
 import { LoanRepaymentDto } from './dto/loan-repayment.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
@@ -33,11 +39,37 @@ export class VehicleController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new vehicle' })
-  create(@Req() req, @Body() createVehicleDto: CreateVehicleDto) {
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Create a new vehicle with binary photo uploads' })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'displayPhoto', maxCount: 1 },
+      { name: 'vehiclePhotos', maxCount: 10 },
+    ]),
+  )
+  create(
+    @Req() req,
+    @Body() createVehicleDto: CreateVehicleDto,
+    @UploadedFiles()
+    files: {
+      displayPhoto?: Express.Multer.File[];
+      vehiclePhotos?: Express.Multer.File[];
+    },
+  ) {
     const agencyId = req.user.agencyId;
     const userId = req.user.agencyId || req.user.userId;
-    return this.vehicleService.create(createVehicleDto, agencyId, userId);
+
+    if (!files?.displayPhoto?.[0]) {
+      throw new BadRequestException('displayPhoto is mandatory');
+    }
+
+    return this.vehicleService.create(
+      createVehicleDto,
+      agencyId,
+      userId,
+      files.displayPhoto[0],
+      files.vehiclePhotos,
+    );
   }
 
   @Get()
@@ -106,5 +138,47 @@ export class VehicleController {
   getLoanHistory(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
     return this.vehicleService.getLoanRepaymentHistory(vehicleId, agencyId);
+  }
+
+  @Patch(':vehicleId/photos')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Update vehicle display photo or append gallery photos (Binary upload)',
+  })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'displayPhoto', maxCount: 1 },
+      { name: 'addPhotos', maxCount: 10 },
+    ]),
+  )
+  updatePhotos(
+    @Req() req,
+    @Param('vehicleId') vehicleId: string,
+    @UploadedFiles()
+    files: {
+      displayPhoto?: Express.Multer.File[];
+      addPhotos?: Express.Multer.File[];
+    },
+  ) {
+    const agencyId = req.user.agencyId;
+    return this.vehicleService.updateVehiclePhotos(
+      vehicleId,
+      agencyId,
+      files?.displayPhoto?.[0],
+      files?.addPhotos,
+    );
+  }
+
+  @Delete(':vehicleId/gallery')
+  @ApiOperation({
+    summary: 'Remove specific gallery photos or all gallery photos',
+  })
+  removeGalleryPhotos(
+    @Req() req,
+    @Param('vehicleId') vehicleId: string,
+    @Body() dto: RemoveVehiclePhotosDto,
+  ) {
+    const agencyId = req.user.agencyId;
+    return this.vehicleService.removeVehiclePhotos(vehicleId, dto, agencyId);
   }
 }

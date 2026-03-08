@@ -16,11 +16,15 @@ import {
 } from './schemas/vehicle.schema';
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { UpdateVehicleDto, UpdateVehiclePhotosDto } from './dto/update-vehicle.dto';
+import { RemoveVehiclePhotosDto } from './dto/remove-vehicle-photos.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
 import { AgenciesService } from '../../agencies/agencies.service';
 import { SubscriptionTier } from '../../agencies/schemas/agency.schema';
 import { LogbookSessionAtoComplianceService } from '../logbooksession-ato-compliance/logbook-session-ato-compliance.service';
+import { AwsService } from '../../aws/aws.service';
+import { v4 as uuid } from 'uuid';
+import * as path from 'path';
 
 @Injectable()
 export class VehicleService {
@@ -33,6 +37,7 @@ export class VehicleService {
     private readonly maintenanceService: MaintenanceService,
     private readonly agenciesService: AgenciesService,
     private readonly logbookSessionService: LogbookSessionAtoComplianceService,
+    private readonly awsService: AwsService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -57,10 +62,14 @@ export class VehicleService {
     createVehicleDto: CreateVehicleDto,
     agencyId: string,
     userId: string,
+    displayPhoto: Express.Multer.File,
+    vehiclePhotos?: Express.Multer.File[],
   ): Promise<{ vehicle: VehicleDocument; logbookSessionId: any }> {
     const vehicleData: any = {
       ...createVehicleDto,
       agencyId: new Types.ObjectId(agencyId),
+      displayPhoto: null,
+      vehiclePhotos: [],
     };
 
     if (createVehicleDto.leaseType === LeaseType.LOAN) {
@@ -92,6 +101,24 @@ export class VehicleService {
     }
 
     const vehicle = new this.vehicleModel(vehicleData);
+
+    // ── Update photos logic ──
+    const displayExt = path.extname(displayPhoto.originalname).toLowerCase();
+    const displayKey = `${agencyId}/vehicles/${vehicle._id}/display-${uuid()}${displayExt}`;
+    await this.awsService.uploadFile(displayPhoto.buffer, displayKey, displayPhoto.mimetype);
+    vehicle.displayPhoto = displayKey;
+
+    if (vehiclePhotos && vehiclePhotos.length > 0) {
+      const photoKeys = await Promise.all(
+        vehiclePhotos.map(async (file) => {
+          const ext = path.extname(file.originalname).toLowerCase();
+          const key = `${agencyId}/vehicles/${vehicle._id}/gallery-${uuid()}${ext}`;
+          return this.awsService.uploadFile(file.buffer, key, file.mimetype);
+        }),
+      );
+      vehicle.vehiclePhotos = photoKeys;
+    }
+
     const saved = await vehicle.save();
 
     // Bootstrap the preventive maintenance cycle for this new vehicle
@@ -216,6 +243,20 @@ export class VehicleService {
     // 3. Delete Vehicle
     await this.vehicleModel.deleteOne({ _id: vehicle._id }).exec();
 
+    // 4. Cleanup photos from S3
+    if (vehicle.displayPhoto) {
+      this.awsService.deleteFile(vehicle.displayPhoto).catch((e) =>
+        console.error(`Failed to delete displayPhoto from S3: ${e.message}`),
+      );
+    }
+    if (vehicle.vehiclePhotos && vehicle.vehiclePhotos.length > 0) {
+      vehicle.vehiclePhotos.forEach((photo) => {
+        this.awsService.deleteFile(photo).catch((e) =>
+          console.error(`Failed to delete gallery photo from S3: ${e.message}`),
+        );
+      });
+    }
+
     return vehicle;
   }
 
@@ -306,5 +347,142 @@ export class VehicleService {
   ): Promise<any[]> {
     const vehicle = await this.findOne(vehicleId, agencyId);
     return vehicle.loanRepaymentHistory || [];
+  }
+
+  async updateVehiclePhotos(
+    vehicleId: string,
+    agencyId: string,
+    displayPhoto?: Express.Multer.File,
+    addPhotos?: Express.Multer.File[],
+  ): Promise<VehicleDocument> {
+    this.validateObjectId(vehicleId, 'Vehicle ID');
+
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
+
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
+    }
+
+    const updateQuery: any = {};
+    const setQuery: any = {};
+    const pushQuery: any = {};
+
+    if (displayPhoto) {
+      // 1. Delete old display photo if it exists
+      if (vehicle.displayPhoto) {
+        this.awsService.deleteFile(vehicle.displayPhoto).catch((e) =>
+          console.error(`Failed to delete old displayPhoto from S3: ${e.message}`),
+        );
+      }
+      // 2. Upload new display photo
+      const ext = path.extname(displayPhoto.originalname).toLowerCase();
+      const key = `${agencyId}/vehicles/${vehicle._id}/display-${uuid()}${ext}`;
+      await this.awsService.uploadFile(displayPhoto.buffer, key, displayPhoto.mimetype);
+      setQuery.displayPhoto = key;
+    }
+
+    if (addPhotos && addPhotos.length > 0) {
+      const newPhotoKeys = await Promise.all(
+        addPhotos.map(async (file) => {
+          const ext = path.extname(file.originalname).toLowerCase();
+          const key = `${agencyId}/vehicles/${vehicle._id}/gallery-${uuid()}${ext}`;
+          return this.awsService.uploadFile(file.buffer, key, file.mimetype);
+        }),
+      );
+      pushQuery.vehiclePhotos = { $each: newPhotoKeys };
+    }
+
+    if (Object.keys(setQuery).length > 0) {
+      updateQuery.$set = setQuery;
+    }
+
+    if (Object.keys(pushQuery).length > 0) {
+      updateQuery.$push = pushQuery;
+    }
+
+    if (Object.keys(updateQuery).length === 0) {
+      throw new BadRequestException('No photo updates provided');
+    }
+
+    const updated = await this.vehicleModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(vehicleId),
+          agencyId: new Types.ObjectId(agencyId),
+        },
+        updateQuery,
+        { new: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found after update`);
+    }
+
+    return updated;
+  }
+
+  async removeVehiclePhotos(
+    vehicleId: string,
+    dto: RemoveVehiclePhotosDto,
+    agencyId: string,
+  ): Promise<VehicleDocument> {
+    this.validateObjectId(vehicleId, 'Vehicle ID');
+
+    const vehicle = await this.vehicleModel
+      .findOne({
+        _id: new Types.ObjectId(vehicleId),
+        agencyId: new Types.ObjectId(agencyId),
+      })
+      .exec();
+
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
+    }
+
+    let updateQuery: any = {};
+    let photosToDelete: string[] = [];
+
+    if (dto.deleteAll === true) {
+      updateQuery = { $set: { vehiclePhotos: [] } };
+      photosToDelete = vehicle.vehiclePhotos;
+    } else if (dto.photos && dto.photos.length > 0) {
+      updateQuery = { $pull: { vehiclePhotos: { $in: dto.photos } } };
+      photosToDelete = dto.photos;
+    } else {
+      throw new BadRequestException(
+        'Either photos array or deleteAll: true must be provided',
+      );
+    }
+
+    const updatedVehicle = await this.vehicleModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(vehicleId),
+          agencyId: new Types.ObjectId(agencyId),
+        },
+        updateQuery,
+        { new: true },
+      )
+      .exec();
+
+    if (!updatedVehicle) {
+      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found after update`);
+    }
+
+    if (photosToDelete.length > 0) {
+      photosToDelete.forEach((photo) => {
+        this.awsService.deleteFile(photo).catch((e) =>
+          console.error(`Failed to delete gallery photo from S3: ${e.message}`),
+        );
+      });
+    }
+
+    return updatedVehicle;
   }
 }
