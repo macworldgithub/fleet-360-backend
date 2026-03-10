@@ -120,6 +120,34 @@ export class Vehicle {
 
   @Prop({ type: Types.ObjectId, default: null })
   currentDriverId: Types.ObjectId;
+
+  @Prop({ type: Number, default: null })
+  nextServiceDueAtKm: number | null;
+
+  @Prop({ type: Date, default: null })
+  scheduledServiceDate: Date | null;
+
+  @Prop({ required: true, trim: true })
+  displayPhoto: string;
+
+  @Prop({ type: [String], default: [] })
+  vehiclePhotos: string[];
+
+  @Prop({
+    type: [
+      {
+        amount: { type: Number, required: true },
+        paymentDate: { type: Date, default: Date.now },
+        remainingBalance: { type: Number },
+      },
+    ],
+    default: [],
+  })
+  loanRepaymentHistory: {
+    amount: number;
+    paymentDate: Date;
+    remainingBalance: number;
+  }[];
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

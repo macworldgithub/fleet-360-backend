@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,28 +35,32 @@ export class FuelController {
   @Get('fuel-transactions')
   @ApiOperation({ summary: 'Get fuel transactions' })
   findAll(
-    @Query('agencyId') agencyId: string,
+    @Req() req,
     @Query('vehicleId') vehicleId?: string,
+    @Query('agencyId') agencyId?: string,
   ) {
-    return this.fuelService.findAll({ vehicleId }, agencyId);
+    const userAgencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.fuelService.findAll({ vehicleId, agencyId }, userAgencyId, role);
   }
 
   @Get('fuel-transactions/:id')
   @ApiOperation({ summary: 'Get fuel transaction by ID' })
-  findOne(
-    @Param('id') id: string,
-    @Query('agencyId') agencyId: string,
-  ) {
-    return this.fuelService.findOne(id, agencyId);
+  findOne(@Req() req, @Param('id') id: string) {
+    const agencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.fuelService.findOne(id, agencyId, role);
   }
 
   @Patch('fuel-transactions/:id')
   @ApiOperation({ summary: 'Update fuel transaction' })
   update(
+    @Req() req,
     @Param('id') id: string,
-    @Query('agencyId') agencyId: string,
     @Body() dto: UpdateFuelTransactionDto,
   ) {
-    return this.fuelService.update(id, dto, agencyId);
+    const agencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.fuelService.update(id, dto, agencyId, role);
   }
 }

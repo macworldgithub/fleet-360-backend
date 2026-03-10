@@ -4,6 +4,7 @@ import { Driver, DriverSchema } from './schemas/driver.schema';
 import { Vehicle, VehicleSchema } from '../vehicles/schemas/vehicle.schema';
 import { DriverService } from './driver.service';
 import { DriverController } from './driver.controller';
+import { AwsModule } from '../../aws/aws.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { DriverController } from './driver.controller';
       { name: Driver.name, schema: DriverSchema },
       { name: Vehicle.name, schema: VehicleSchema },
     ]),
+    AwsModule,
   ],
   controllers: [DriverController],
   providers: [DriverService],

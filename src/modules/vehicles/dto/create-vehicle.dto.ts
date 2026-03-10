@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsDateString,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FuelType, LeaseType, VehicleStatus } from '../schemas/vehicle.schema';
@@ -142,4 +143,14 @@ export class CreateVehicleDto {
   @IsNumber()
   @IsOptional()
   depreciationRate?: number;
+
+  @ApiProperty({ type: 'string', format: 'binary', example: 'main.jpg' })
+  displayPhoto: any;
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string', format: 'binary' },
+    example: ['front.jpg', 'back.jpg'],
+  })
+  vehiclePhotos?: any[];
 }

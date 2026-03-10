@@ -14,6 +14,9 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { IncidentModule } from './modules/incidents/incident.module';
 import { AwsModule } from './aws/aws.module';
 import { FuelModule } from './modules/fuel/fuel.module';
+import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelligence.module';
+import { BillingModule } from './modules/billings/billing.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -39,7 +42,10 @@ import { FuelModule } from './modules/fuel/fuel.module';
     MaintenanceModule,
     IncidentModule,
     FuelModule,
+    CostIntelligenceModule,
     AwsModule,
+    BillingModule,
+    DashboardModule
   ],
 })
 export class AppModule {}

@@ -11,9 +11,13 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -23,6 +27,7 @@ import { KmLogsService } from './km-logs.service';
 import { CreateKmLogDto } from './dto/create-km-log.dto';
 import { UpdateKmLogDto } from './dto/update-km-log.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('KM Logs')
 @ApiBearerAuth()
@@ -33,10 +38,38 @@ export class KmLogsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a KM log (Trip log)' })
-  create(@Req() req, @Body() dto: CreateKmLogDto) {
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Create a KM log (Trip log) with mandatory odometer photos' })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'startOdometerPhoto', maxCount: 1 },
+      { name: 'endOdometerPhoto', maxCount: 1 },
+    ]),
+  )
+  create(
+    @Req() req,
+    @Body() dto: CreateKmLogDto,
+    @UploadedFiles()
+    files: {
+      startOdometerPhoto?: Express.Multer.File[];
+      endOdometerPhoto?: Express.Multer.File[];
+    },
+  ) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.create(dto, agencyId);
+
+    if (!files?.startOdometerPhoto?.[0] || !files?.endOdometerPhoto?.[0]) {
+      throw new BadRequestException(
+        'Both startOdometerPhoto and endOdometerPhoto are mandatory',
+      );
+    }
+
+    return this.kmLogsService.create(
+      dto,
+      agencyId,
+      files.startOdometerPhoto[0],
+      files.endOdometerPhoto[0],
+      req.user.role,
+    );
   }
 
   @Get()
@@ -62,7 +95,7 @@ export class KmLogsController {
       tripType,
       fromDate,
       toDate,
-    });
+    }, req.user.role);
   }
 
   @Get(':logId')
@@ -70,15 +103,39 @@ export class KmLogsController {
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
   findOne(@Req() req, @Param('logId') logId: string) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.findOne(logId, agencyId);
+    const role = req.user.role;
+    return this.kmLogsService.findOne(logId, agencyId, role);
   }
 
   @Patch(':logId')
-  @ApiOperation({ summary: 'Update KM log by ID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update KM log by ID (Optional photo updates)' })
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
-  update(@Req() req, @Param('logId') logId: string, @Body() dto: UpdateKmLogDto) {
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'startOdometerPhoto', maxCount: 1 },
+      { name: 'endOdometerPhoto', maxCount: 1 },
+    ]),
+  )
+  update(
+    @Req() req,
+    @Param('logId') logId: string,
+    @Body() dto: UpdateKmLogDto,
+    @UploadedFiles()
+    files: {
+      startOdometerPhoto?: Express.Multer.File[];
+      endOdometerPhoto?: Express.Multer.File[];
+    },
+  ) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.update(logId, dto, agencyId);
+    return this.kmLogsService.update(
+      logId,
+      dto,
+      agencyId,
+      files?.startOdometerPhoto?.[0],
+      files?.endOdometerPhoto?.[0],
+      req.user.role,
+    );
   }
 
   @Delete(':logId')
@@ -86,6 +143,7 @@ export class KmLogsController {
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
   remove(@Req() req, @Param('logId') logId: string) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.remove(logId, agencyId);
+    const role = req.user.role;
+    return this.kmLogsService.remove(logId, agencyId, role);
   }
 }

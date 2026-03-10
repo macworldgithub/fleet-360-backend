@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,11 +17,8 @@ import {
   LogbookSession,
   LogbookSessionDocument,
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
-import {
-  Vehicle,
-  VehicleDocument,
-  VehicleStatus,
-} from '../vehicles/schemas/vehicle.schema';
+import { Vehicle, VehicleDocument, VehicleStatus } from '../vehicles/schemas/vehicle.schema';
+import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { AgencyRole } from '../../agencies/schemas/agency.schema';
 
@@ -30,6 +28,8 @@ const SNOOZE_DAYS = 14;
 
 @Injectable()
 export class MaintenanceService {
+  private readonly logger = new Logger(MaintenanceService.name);
+
   constructor(
     @InjectModel(Maintenance.name)
     private maintenanceModel: Model<MaintenanceDocument>,
@@ -37,6 +37,8 @@ export class MaintenanceService {
     private logbookSessionModel: Model<LogbookSessionDocument>,
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
+    @InjectModel(Driver.name)
+    private driverModel: Model<DriverDocument>,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -52,7 +54,16 @@ export class MaintenanceService {
     userId: string,
     agencyId: string,
   ): Promise<MaintenanceDocument> {
+    this.logger.log(`Creating maintenance: vehicleId=${dto.vehicleId}, userId=${userId}, agencyId=${agencyId}`);
+    
     this.validateObjectId(dto.vehicleId, 'vehicleId');
+    if (userId) this.validateObjectId(userId, 'userId');
+    if (agencyId) this.validateObjectId(agencyId, 'agencyId');
+    
+    if (!agencyId) {
+      this.logger.error('agencyId is missing in create maintenance request');
+      throw new BadRequestException('agencyId is required to create maintenance');
+    }
 
     // Find latest logbook session for the vehicle
     const latestSession = await this.logbookSessionModel
@@ -61,61 +72,43 @@ export class MaintenanceService {
       .exec();
 
     if (!latestSession) {
+      this.logger.warn(`No logbook session found for vehicle ${dto.vehicleId}`);
       throw new NotFoundException(
         `No logbook session found for vehicle ${dto.vehicleId}`,
       );
     }
 
-    const maintenance = new this.maintenanceModel({
-      vehicleId: new Types.ObjectId(dto.vehicleId),
-      agencyId: new Types.ObjectId(agencyId),
-      maintenanceType: dto.maintenanceType,
-      description: dto.description || null,
-      odometerAtRequest: latestSession.endOdometerInKms,
-      estimatedCost: dto.estimatedCost || null,
-      status: MaintenanceStatus.DRAFT,
-      createdBy: new Types.ObjectId(userId),
-    });
+    this.logger.log(`Found latest session: id=${latestSession._id}, endOdometerInKms=${latestSession.endOdometerInKms}`);
 
-    return maintenance.save();
+    try {
+      const maintenance = new this.maintenanceModel({
+        vehicleId: new Types.ObjectId(dto.vehicleId),
+        agencyId: agencyId ? new Types.ObjectId(agencyId) : null,
+        maintenanceType: dto.maintenanceType,
+        description: dto.description || null,
+        odometerAtRequest: latestSession.endOdometerInKms || 0,
+        estimatedCost: dto.estimatedCost || null,
+        status: MaintenanceStatus.SUBMITTED,
+        createdBy: userId ? new Types.ObjectId(userId) : null,
+        submittedBy: userId ? new Types.ObjectId(userId) : null,
+        submittedAt: new Date(),
+      });
+
+      const saved = await maintenance.save();
+      this.logger.log(`Maintenance saved successfully: id=${saved._id}`);
+
+      // Automatically move vehicle to IN_MAINTENANCE status
+      await this.vehicleModel.findByIdAndUpdate(dto.vehicleId, {
+        $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
+      });
+
+      return saved;
+    } catch (error) {
+      this.logger.error(`Error saving maintenance: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
-  // ===================== SUBMIT =====================
-
-  async submit(id: string, userId: string): Promise<MaintenanceDocument> {
-    this.validateObjectId(id, 'Maintenance ID');
-
-    const maintenance = await this.maintenanceModel.findById(id).exec();
-    if (!maintenance) {
-      throw new NotFoundException(`Maintenance with ID ${id} not found`);
-    }
-
-    // Only the creator can submit
-    if (maintenance.createdBy.toString() !== userId) {
-      throw new ForbiddenException(
-        'Only the creator can submit this maintenance request',
-      );
-    }
-
-    // Only DRAFT can move to SUBMITTED
-    if (maintenance.status !== MaintenanceStatus.DRAFT) {
-      throw new BadRequestException(
-        `Cannot submit maintenance in ${maintenance.status} status. Only DRAFT can be submitted.`,
-      );
-    }
-
-    maintenance.status = MaintenanceStatus.SUBMITTED;
-    maintenance.submittedBy = new Types.ObjectId(userId);
-    maintenance.submittedAt = new Date();
-    await maintenance.save();
-
-    // Update vehicle status to IN_MAINTENANCE
-    await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
-      $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
-    });
-
-    return maintenance;
-  }
 
   // ===================== APPROVE =====================
 
@@ -169,9 +162,10 @@ export class MaintenanceService {
     maintenance.status = MaintenanceStatus.REJECTED;
     maintenance.rejectedBy = new Types.ObjectId(userId);
     maintenance.rejectedAt = new Date();
+
     await maintenance.save();
 
-    // ── Snooze logic for auto-generated maintenance ──
+    // If it was an auto-generated maintenance, find the latest COMPLETED one to snooze it
     if (maintenance.autoGenerated) {
       const latestCompleted = await this.maintenanceModel
         .findOne({
@@ -193,14 +187,28 @@ export class MaintenanceService {
         }
 
         await latestCompleted.save();
+
+        // Sync the snoozed values to the vehicle
+        await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
+          $set: {
+            nextServiceDueAtKm: latestCompleted.nextServiceDueAtKm,
+            scheduledServiceDate: latestCompleted.scheduledServiceDate,
+          },
+        });
       }
     }
 
-    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
     const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
-    const newStatus = vehicle?.currentDriverId 
-      ? VehicleStatus.ASSIGNED 
-      : VehicleStatus.ACTIVATE;
+    let newStatus = VehicleStatus.ACTIVATE;
+
+    if (vehicle?.currentDriverId) {
+      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      // If driver is still assigned to THIS specific vehicle
+      if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
+        newStatus = VehicleStatus.ASSIGNED;
+      }
+    }
 
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
       $set: { vehicleStatus: newStatus },
@@ -289,14 +297,24 @@ export class MaintenanceService {
     maintenance.scheduledServiceDate = scheduledServiceDate;
     await maintenance.save();
 
-    // Revert vehicle status back to ASSIGNED (if driver exists) or ACTIVATE
+    // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
     const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
-    const newStatus = vehicle?.currentDriverId 
-      ? VehicleStatus.ASSIGNED 
-      : VehicleStatus.ACTIVATE;
+    let newStatus = VehicleStatus.ACTIVATE;
+
+    if (vehicle?.currentDriverId) {
+      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      // If driver is still assigned to THIS specific vehicle
+      if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
+        newStatus = VehicleStatus.ASSIGNED;
+      }
+    }
 
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
-      $set: { vehicleStatus: newStatus },
+      $set: { 
+        vehicleStatus: newStatus,
+        nextServiceDueAtKm: maintenance.nextServiceDueAtKm,
+        scheduledServiceDate: maintenance.scheduledServiceDate,
+      },
     });
 
     return maintenance;
@@ -336,6 +354,14 @@ export class MaintenanceService {
     });
 
     await seedMaintenance.save();
+
+    // Update vehicle with the next service info
+    await this.vehicleModel.findByIdAndUpdate(vehicleOid, {
+      $set: {
+        nextServiceDueAtKm: seedMaintenance.nextServiceDueAtKm,
+        scheduledServiceDate: seedMaintenance.scheduledServiceDate,
+      },
+    });
   }
 
   // ===================== AUTO-CREATE MAINTENANCE =====================
@@ -369,11 +395,11 @@ export class MaintenanceService {
       return; // Hasn't reached the threshold yet
     }
 
-    // Check for existing DRAFT or SUBMITTED maintenance to prevent duplicates
+    // Check for existing SUBMITTED maintenance to prevent duplicates
     const existingActive = await this.maintenanceModel
       .findOne({
         vehicleId: vehicleOid,
-        status: { $in: [MaintenanceStatus.DRAFT, MaintenanceStatus.SUBMITTED] },
+        status: MaintenanceStatus.SUBMITTED,
       })
       .exec();
 
@@ -404,11 +430,16 @@ export class MaintenanceService {
 
   // ===================== GET ALL FOR VEHICLE =====================
 
-  async findByVehicle(vehicleId: string): Promise<MaintenanceDocument[]> {
+  async findByVehicle(vehicleId: string, agencyId?: string, role?: string): Promise<MaintenanceDocument[]> {
     this.validateObjectId(vehicleId, 'vehicleId');
 
+    const filter: any = { vehicleId: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL' && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     return this.maintenanceModel
-      .find({ vehicleId: new Types.ObjectId(vehicleId) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .exec();
   }
@@ -416,8 +447,14 @@ export class MaintenanceService {
   async findAll(
     agencyId: string,
     status?: MaintenanceStatus,
+    role?: string,
   ): Promise<MaintenanceDocument[]> {
-    const query: any = { agencyId: new Types.ObjectId(agencyId) };
+    const isPrincipal = role === 'PRINCIPAL';
+    const query: any = {};
+
+    if (!isPrincipal) {
+      query.agencyId = new Types.ObjectId(agencyId);
+    }
 
     if (status) {
       query.status = status;

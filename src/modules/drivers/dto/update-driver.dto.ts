@@ -21,4 +21,8 @@ export class UpdateDriverDto {
   @IsString()
   @IsOptional()
   driverLicenseNumber?: string;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  profilePicture?: any;
 }

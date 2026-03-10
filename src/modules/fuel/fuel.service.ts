@@ -35,34 +35,47 @@ export class FuelService {
     return this.fuelModel.create(data);
   }
 
-  async findAll(query: any, agencyId: string) {
+  async findAll(query: any, agencyId: string, role?: string) {
+    const isPrincipal = role === 'PRINCIPAL';
     const filter: any = { 
       isDeleted: false,
-      agencyId: new Types.ObjectId(agencyId),
     };
+
+    if (!isPrincipal) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    } else if (query.agencyId) {
+      filter.agencyId = new Types.ObjectId(query.agencyId);
+    }
 
     if (query.vehicleId) filter.vehicleId = new Types.ObjectId(query.vehicleId);
 
     return this.fuelModel.find(filter).sort({ fuelDate: -1 }).exec();
   }
 
-  async findOne(id: string, agencyId: string) {
+  async findOne(id: string, agencyId: string, role?: string) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid ID');
     
-    const fuel = await this.fuelModel.findOne({
-      _id: new Types.ObjectId(id),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(id) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const fuel = await this.fuelModel.findOne(filter).exec();
 
     if (!fuel) throw new NotFoundException('Transaction not found');
     return fuel;
   }
 
-  async update(id: string, dto: UpdateFuelTransactionDto, agencyId: string) {
+  async update(id: string, dto: UpdateFuelTransactionDto, agencyId: string, role?: string) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid ID');
 
+    const filter: any = { _id: new Types.ObjectId(id) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const fuel = await this.fuelModel.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(agencyId) },
+      filter,
       dto,
       { new: true },
     ).exec();

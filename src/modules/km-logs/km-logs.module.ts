@@ -12,6 +12,7 @@ import {
   LogbookSessionSchema,
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
 import { MaintenanceModule } from '../maintenance/maintenance.module';
+import { AwsModule } from 'src/aws/aws.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { MaintenanceModule } from '../maintenance/maintenance.module';
       { name: Vehicle.name, schema: VehicleSchema },
     ]),
     MaintenanceModule,
+    AwsModule,
   ],
   controllers: [KmLogsController],
   providers: [KmLogsService],

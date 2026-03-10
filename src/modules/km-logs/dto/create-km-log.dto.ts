@@ -47,10 +47,12 @@ export class CreateKmLogDto {
   tripDate: string;
 
   @ApiProperty({ example: 12000 })
+  @Type(() => Number)
   @IsNumber()
   startOdometerInKms: number;
 
   @ApiProperty({ example: 12040 })
+  @Type(() => Number)
   @IsNumber()
   endOdometerInKms: number;
 
@@ -67,4 +69,10 @@ export class CreateKmLogDto {
   @IsOptional()
   @IsString()
   businessPurpose?: string;
+
+  @ApiProperty({ type: 'string', format: 'binary', description: 'Photo of the odometer at the start of the trip' })
+  startOdometerPhoto: any;
+
+  @ApiProperty({ type: 'string', format: 'binary', description: 'Photo of the odometer at the end of the trip' })
+  endOdometerPhoto: any;
 }

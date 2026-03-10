@@ -22,6 +22,9 @@ export class Driver {
 
   @Prop({ type: Types.ObjectId, ref: 'Vehicle', default: null })
   assignedVehicle: Types.ObjectId | null;
+
+  @Prop({ type: String, default: null })
+  profilePicture: string | null;
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);

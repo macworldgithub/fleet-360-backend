@@ -4,7 +4,6 @@ import { Document, Types } from 'mongoose';
 export type MaintenanceDocument = Maintenance & Document;
 
 export enum MaintenanceStatus {
-  DRAFT = 'DRAFT',
   SUBMITTED = 'SUBMITTED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
@@ -54,7 +53,7 @@ export class Maintenance {
   @Prop({ type: Number, default: null })
   actualCost: number | null;
 
-  @Prop({ enum: MaintenanceStatus, default: MaintenanceStatus.DRAFT })
+  @Prop({ enum: MaintenanceStatus, default: MaintenanceStatus.SUBMITTED })
   status: MaintenanceStatus;
 
   @Prop({ type: Types.ObjectId, required: false, default: null })

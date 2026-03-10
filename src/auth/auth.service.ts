@@ -55,7 +55,7 @@ export class AuthService {
     );
   }
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, file?: Express.Multer.File) {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already registered');
 
@@ -117,6 +117,7 @@ export class AuthService {
           driverLicenseNumber: dto.driverLicenseNumber!,
         },
         resolvedAgencyId,
+        file,
       );
       driverData = driver;
     }

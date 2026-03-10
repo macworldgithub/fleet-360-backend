@@ -5,6 +5,9 @@ import { Driver, DriverSchema } from '../drivers/schemas/driver.schema';
 import { VehicleService } from './vehicle.service';
 import { VehicleController } from './vehicle.controller';
 import { MaintenanceModule } from '../maintenance/maintenance.module';
+import { AgenciesModule } from '../../agencies/agencies.module';
+import { LogbookSessionAtoComplianceModule } from '../logbooksession-ato-compliance/logbook-session-ato-compliance.module';
+import { AwsModule } from '../../aws/aws.module';
 
 @Module({
   imports: [
@@ -13,6 +16,9 @@ import { MaintenanceModule } from '../maintenance/maintenance.module';
       { name: Driver.name, schema: DriverSchema },
     ]),
     forwardRef(() => MaintenanceModule),
+    AgenciesModule,
+    LogbookSessionAtoComplianceModule,
+    AwsModule,
   ],
   controllers: [VehicleController],
   providers: [VehicleService],

@@ -57,6 +57,12 @@ export class KmLog {
   //Reference to the logbook session this trip belongs to (ATO compliance)
   @Prop({ type: Types.ObjectId, default: null, index: true })
   logbookSessionId: Types.ObjectId | null;
+
+  @Prop({ required: true })
+  startOdometerPhoto: string;
+
+  @Prop({ required: true })
+  endOdometerPhoto: string;
 }
 
 export const KmLogSchema = SchemaFactory.createForClass(KmLog);
