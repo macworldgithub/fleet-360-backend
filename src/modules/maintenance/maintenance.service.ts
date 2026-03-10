@@ -21,6 +21,7 @@ import { Vehicle, VehicleDocument, VehicleStatus } from '../vehicles/schemas/veh
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { AgencyRole } from '../../agencies/schemas/agency.schema';
+import { AwsService } from '../../aws/aws.service';
 
 const PREVENTIVE_INTERVAL_KM = 5000;
 const SNOOZE_INTERVAL_KM = 500;
@@ -39,6 +40,7 @@ export class MaintenanceService {
     private vehicleModel: Model<VehicleDocument>,
     @InjectModel(Driver.name)
     private driverModel: Model<DriverDocument>,
+    private readonly awsService: AwsService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -53,6 +55,7 @@ export class MaintenanceService {
     dto: CreateMaintenanceDto,
     userId: string,
     agencyId: string,
+    file?: Express.Multer.File,
   ): Promise<MaintenanceDocument> {
     this.logger.log(`Creating maintenance: vehicleId=${dto.vehicleId}, userId=${userId}, agencyId=${agencyId}`);
     
@@ -94,15 +97,21 @@ export class MaintenanceService {
         submittedAt: new Date(),
       });
 
-      const saved = await maintenance.save();
-      this.logger.log(`Maintenance saved successfully: id=${saved._id}`);
+      if (file) {
+        const key = `maintenance/${maintenance._id.toString()}-${Date.now()}-${file.originalname}`;
+        await this.awsService.uploadFile(file.buffer, key, file.mimetype);
+        maintenance.photoKey = key;
+      }
+
+      const savedFinal = await maintenance.save();
+      this.logger.log(`Maintenance saved successfully: id=${savedFinal._id}`);
 
       // Automatically move vehicle to IN_MAINTENANCE status
       await this.vehicleModel.findByIdAndUpdate(dto.vehicleId, {
         $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
       });
 
-      return saved;
+      return this.attachPhotoUrl(savedFinal);
     } catch (error) {
       this.logger.error(`Error saving maintenance: ${error.message}`, error.stack);
       throw error;
@@ -438,10 +447,12 @@ export class MaintenanceService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    return this.maintenanceModel
+    const records = await this.maintenanceModel
       .find(filter)
       .sort({ createdAt: -1 })
       .exec();
+
+    return this.attachPhotoUrlList(records);
   }
 
   async findAll(
@@ -460,11 +471,13 @@ export class MaintenanceService {
       query.status = status;
     }
 
-    return this.maintenanceModel
+    const records = await this.maintenanceModel
       .find(query)
       .populate('vehicleId')
       .sort({ createdAt: -1 })
       .exec();
+
+    return this.attachPhotoUrlList(records);
   }
 
   // ===================== HELPERS =====================
@@ -475,5 +488,19 @@ export class MaintenanceService {
         'Only PRINCIPAL or FLEET_MANAGER can perform this action',
       );
     }
+  }
+
+  private async attachPhotoUrl(maintenance: MaintenanceDocument): Promise<any> {
+    const obj = maintenance.toObject();
+    if (obj.photoKey) {
+      obj['photoUrl'] = await this.awsService.getSignedUrl(obj.photoKey);
+    } else {
+      obj['photoUrl'] = null;
+    }
+    return obj;
+  }
+
+  private async attachPhotoUrlList(maintenances: MaintenanceDocument[]): Promise<any[]> {
+    return Promise.all(maintenances.map((m) => this.attachPhotoUrl(m)));
   }
 }

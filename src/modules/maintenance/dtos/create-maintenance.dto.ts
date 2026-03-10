@@ -32,8 +32,11 @@ export class CreateMaintenanceDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ example: 250 })
   @IsNumber()
   @IsOptional()
   estimatedCost?: number;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Photo of the maintenance issue' })
+  @IsOptional()
+  photo?: any;
 }
