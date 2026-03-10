@@ -22,6 +22,8 @@ import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { AgencyRole } from '../../agencies/schemas/agency.schema';
 import { AwsService } from '../../aws/aws.service';
+import { v4 as uuidv4 } from 'uuid';
+import { extname } from 'path';
 
 const PREVENTIVE_INTERVAL_KM = 5000;
 const SNOOZE_INTERVAL_KM = 500;
@@ -55,7 +57,7 @@ export class MaintenanceService {
     dto: CreateMaintenanceDto,
     userId: string,
     agencyId: string,
-    file?: Express.Multer.File,
+    files?: Express.Multer.File[],
   ): Promise<MaintenanceDocument> {
     this.logger.log(`Creating maintenance: vehicleId=${dto.vehicleId}, userId=${userId}, agencyId=${agencyId}`);
     
@@ -97,10 +99,15 @@ export class MaintenanceService {
         submittedAt: new Date(),
       });
 
-      if (file) {
-        const key = `maintenance/${maintenance._id.toString()}-${Date.now()}-${file.originalname}`;
-        await this.awsService.uploadFile(file.buffer, key, file.mimetype);
-        maintenance.photoKey = key;
+      if (files && files.length > 0) {
+        const uploadedKeys: string[] = [];
+        for (const file of files) {
+          const ext = extname(file.originalname).toLowerCase();
+          const key = `${agencyId}/maintenance/${maintenance._id}/${uuidv4()}${ext}`;
+          await this.awsService.uploadFile(file.buffer, key, file.mimetype);
+          uploadedKeys.push(key);
+        }
+        maintenance.photos = uploadedKeys;
       }
 
       const savedFinal = await maintenance.save();
@@ -492,11 +499,16 @@ export class MaintenanceService {
 
   private async attachPhotoUrl(maintenance: MaintenanceDocument): Promise<any> {
     const obj = maintenance.toObject();
-    if (obj.photoKey) {
-      obj['photoUrl'] = await this.awsService.getSignedUrl(obj.photoKey);
+    if (obj.photos && obj.photos.length > 0) {
+      obj['photoUrls'] = await Promise.all(
+        obj.photos.map((key) => this.awsService.getSignedUrl(key)),
+      );
     } else {
-      obj['photoUrl'] = null;
+      obj['photoUrls'] = [];
     }
+    // Remove old field if it exists in data
+    delete obj['photoKey'];
+    delete obj['photoUrl'];
     return obj;
   }
 
