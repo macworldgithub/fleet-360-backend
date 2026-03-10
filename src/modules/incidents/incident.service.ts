@@ -68,24 +68,30 @@ export class IncidentService {
     return incident;
   }
 
-  async findAll(agencyId: string, vehicleId?: string) {
+  async findAll(agencyId: string, vehicleId?: string, role?: string) {
+    const isPrincipal = role === 'PRINCIPAL';
     const query: any = { 
       isDeleted: false,
-      agencyId: new Types.ObjectId(agencyId),
     };
+
+    if (!isPrincipal) {
+      query.agencyId = new Types.ObjectId(agencyId);
+    }
 
     if (vehicleId) query.vehicleId = new Types.ObjectId(vehicleId);
 
     return this.incidentModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
-  async findOne(id: string, agencyId: string) {
+  async findOne(id: string, agencyId: string, role?: string) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
 
-    const incident = await this.incidentModel.findOne({
-      _id: new Types.ObjectId(id),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(id) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const incident = await this.incidentModel.findOne(filter).exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
     return incident;
@@ -94,8 +100,8 @@ export class IncidentService {
   /**
    * Get signed URLs for all evidence photos of an incident.
    */
-  async getPhotos(id: string, agencyId: string): Promise<{ key: string; url: string }[]> {
-    const incident = await this.findOne(id, agencyId);
+  async getPhotos(id: string, agencyId: string, role?: string): Promise<{ key: string; url: string }[]> {
+    const incident = await this.findOne(id, agencyId, role);
 
     if (!incident.evidencePhotos || incident.evidencePhotos.length === 0) {
       return [];
@@ -118,8 +124,9 @@ export class IncidentService {
     id: string,
     agencyId: string,
     evidencePhotos: Express.Multer.File[],
+    role?: string,
   ): Promise<IncidentDocument> {
-    const incident = await this.findOne(id, agencyId);
+    const incident = await this.findOne(id, agencyId, role);
 
     const uploadedKeys: string[] = [];
 
@@ -142,8 +149,8 @@ export class IncidentService {
   /**
    * Delete a specific photo from an incident.
    */
-  async deletePhoto(id: string, agencyId: string, photoKey: string): Promise<IncidentDocument> {
-    const incident = await this.findOne(id, agencyId);
+  async deletePhoto(id: string, agencyId: string, photoKey: string, role?: string): Promise<IncidentDocument> {
+    const incident = await this.findOne(id, agencyId, role);
 
     if (!incident.evidencePhotos?.includes(photoKey)) {
       throw new NotFoundException('Photo not found on this incident');
@@ -161,11 +168,16 @@ export class IncidentService {
     return incident;
   }
 
-  async update(id: string, dto: UpdateIncidentDto, agencyId: string) {
+  async update(id: string, dto: UpdateIncidentDto, agencyId: string, role?: string) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
 
+    const filter: any = { _id: new Types.ObjectId(id) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const incident = await this.incidentModel.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(agencyId) },
+      filter,
       dto,
       { new: true },
     ).exec();
@@ -174,11 +186,16 @@ export class IncidentService {
     return incident;
   }
 
-  async remove(id: string, agencyId: string) {
+  async remove(id: string, agencyId: string, role?: string) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
 
+    const filter: any = { _id: new Types.ObjectId(id) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const incident = await this.incidentModel.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), agencyId: new Types.ObjectId(agencyId) },
+      filter,
       { isDeleted: true },
       { new: true },
     ).exec();

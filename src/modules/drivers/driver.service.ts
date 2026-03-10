@@ -66,25 +66,32 @@ export class DriverService {
     return driver.save();
   }
 
-  async findAll(agencyId: string): Promise<DriverDocument[]> {
-    this.validateObjectId(agencyId, 'agencyId');
+  async findAll(agencyId: string, role?: string): Promise<DriverDocument[]> {
+    const isPrincipal = role === 'PRINCIPAL';
+    const filter: any = {};
+    
+    if (!isPrincipal) {
+      this.validateObjectId(agencyId, 'agencyId');
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     return this.driverModel
-      .find({ agencyId: new Types.ObjectId(agencyId) })
+      .find(filter)
       .populate('assignedVehicle')
       .sort({ createdAt: -1 })
       .exec();
   }
 
-  async findOne(driverId: string, agencyId: string): Promise<DriverDocument> {
+  async findOne(driverId: string, agencyId: string, role?: string): Promise<DriverDocument> {
     this.validateObjectId(driverId, 'Driver ID');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const filter: any = { _id: new Types.ObjectId(driverId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const driver = await this.driverModel
-      .findOne({
-        _id: new Types.ObjectId(driverId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .populate('assignedVehicle')
       .exec();
 
@@ -95,8 +102,8 @@ export class DriverService {
     return driver;
   }
 
-  async getProfilePictureUrl(driverId: string, agencyId: string): Promise<string | null> {
-    const driver = await this.findOne(driverId, agencyId);
+  async getProfilePictureUrl(driverId: string, agencyId: string, role?: string): Promise<string | null> {
+    const driver = await this.findOne(driverId, agencyId, role);
     if (!driver.profilePicture) return null;
     return this.awsService.getSignedUrl(driver.profilePicture);
   }
@@ -106,15 +113,18 @@ export class DriverService {
     updateDriverDto: UpdateDriverDto,
     agencyId: string,
     file?: Express.Multer.File,
+    role?: string,
   ): Promise<DriverDocument> {
     this.validateObjectId(driverId, 'Driver ID');
     this.validateObjectId(agencyId, 'agencyId');
 
+    const filter: any = { _id: new Types.ObjectId(driverId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const driver = await this.driverModel
-      .findOne({
-        _id: new Types.ObjectId(driverId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!driver) {
@@ -147,14 +157,15 @@ export class DriverService {
     return result;
   }
 
-  async remove(driverId: string, agencyId: string): Promise<void> {
+  async remove(driverId: string, agencyId: string, role?: string): Promise<void> {
     this.validateObjectId(driverId, 'Driver ID');
-    this.validateObjectId(agencyId, 'agencyId');
 
-    const driver = await this.driverModel.findOne({
-      _id: new Types.ObjectId(driverId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(driverId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const driver = await this.driverModel.findOne(filter).exec();
 
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
@@ -189,16 +200,18 @@ export class DriverService {
     driverId: string,
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<DriverDocument> {
     this.validateObjectId(driverId, 'Driver ID');
     this.validateObjectId(vehicleId, 'Vehicle ID');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -215,11 +228,13 @@ export class DriverService {
       );
     }
 
+    const driverFilter: any = { _id: new Types.ObjectId(driverId) };
+    if (role !== 'PRINCIPAL') {
+      driverFilter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const existingDriver = await this.driverModel
-      .findOne({
-        _id: new Types.ObjectId(driverId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(driverFilter)
       .exec();
 
     if (!existingDriver) {
@@ -234,10 +249,7 @@ export class DriverService {
 
     await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
+        filter,
         {
           $set: {
             vehicleStatus: VehicleStatus.ASSIGNED,
@@ -251,10 +263,7 @@ export class DriverService {
 
     const driver = await this.driverModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(driverId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
+        driverFilter,
         { $set: { assignedVehicle: new Types.ObjectId(vehicleId) } },
         { new: true },
       )
@@ -272,18 +281,22 @@ export class DriverService {
     driverId: string,
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<DriverDocument> {
     this.validateObjectId(driverId, 'Driver ID');
     this.validateObjectId(vehicleId, 'Vehicle ID');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const vehicleFilter: any = {
+      _id: new Types.ObjectId(vehicleId),
+      currentDriverId: new Types.ObjectId(driverId),
+    };
+    if (role !== 'PRINCIPAL') {
+      vehicleFilter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-          currentDriverId: new Types.ObjectId(driverId),
-        },
+        vehicleFilter,
         {
           $set: {
             vehicleStatus: VehicleStatus.ACTIVATE,
@@ -295,13 +308,17 @@ export class DriverService {
       )
       .exec();
 
+    const driverFilter: any = {
+      _id: new Types.ObjectId(driverId),
+      assignedVehicle: new Types.ObjectId(vehicleId),
+    };
+    if (role !== 'PRINCIPAL') {
+      driverFilter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const driver = await this.driverModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(driverId),
-          agencyId: new Types.ObjectId(agencyId),
-          assignedVehicle: new Types.ObjectId(vehicleId),
-        },
+        driverFilter,
         { $set: { assignedVehicle: null } },
         { new: true },
       )
@@ -321,18 +338,22 @@ export class DriverService {
     vehicleId: string,
     driverId: string,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
     this.validateObjectId(driverId, 'Driver ID');
-    this.validateObjectId(agencyId, 'Agency ID');
+
+    const filter: any = {
+      _id: new Types.ObjectId(vehicleId),
+      vehicleStatus: VehicleStatus.ACTIVATE,
+    };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-          vehicleStatus: VehicleStatus.ACTIVATE,
-        },
+        filter,
         {
           $set: {
             vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
@@ -356,16 +377,20 @@ export class DriverService {
   async approveVehicle(
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
-    this.validateObjectId(agencyId, 'Agency ID');
+
+    const filter: any = {
+      _id: new Types.ObjectId(vehicleId),
+      vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
+    };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const current = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-        vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
-      })
+      .findOne(filter)
       .exec();
 
     if (!current) {
@@ -376,11 +401,7 @@ export class DriverService {
 
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-          vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
-        },
+        filter,
         {
           $set: {
             vehicleStatus: VehicleStatus.ASSIGNED,
@@ -405,17 +426,21 @@ export class DriverService {
   async rejectVehicle(
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
-    this.validateObjectId(agencyId, 'Agency ID');
+
+    const filter: any = {
+      _id: new Types.ObjectId(vehicleId),
+      vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
+    };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-          vehicleStatus: VehicleStatus.UNDER_AGREEMENT,
-        },
+        filter,
         {
           $set: {
             vehicleStatus: VehicleStatus.ACTIVATE,

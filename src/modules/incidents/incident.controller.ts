@@ -22,7 +22,6 @@ import {
   ApiOperation,
   ApiConsumes,
   ApiParam,
-  ApiBody,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { IncidentService } from './incident.service';
@@ -81,7 +80,8 @@ export class IncidentController {
     @Query('vehicleId') vehicleId?: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.findAll(agencyId, vehicleId);
+    const role = req.user.role;
+    return this.incidentService.findAll(agencyId, vehicleId, role);
   }
 
   @Get(':incidentId')
@@ -89,7 +89,8 @@ export class IncidentController {
   @ApiParam({ name: 'incidentId', description: 'Incident ObjectId' })
   findOne(@Req() req, @Param('incidentId') id: string) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.findOne(id, agencyId);
+    const role = req.user.role;
+    return this.incidentService.findOne(id, agencyId, role);
   }
 
   @Get(':incidentId/photos')
@@ -97,7 +98,8 @@ export class IncidentController {
   @ApiParam({ name: 'incidentId', description: 'Incident ObjectId' })
   getPhotos(@Req() req, @Param('incidentId') id: string) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.getPhotos(id, agencyId);
+    const role = req.user.role;
+    return this.incidentService.getPhotos(id, agencyId, role);
   }
 
   @Post(':incidentId/photos')
@@ -127,10 +129,11 @@ export class IncidentController {
     @UploadedFiles() evidencePhotos: Express.Multer.File[],
   ) {
     const agencyId = req.user.agencyId;
+    const role = req.user.role;
     if (!evidencePhotos || evidencePhotos.length === 0) {
       throw new BadRequestException('At least one photo file is required');
     }
-    return this.incidentService.addPhotos(id, agencyId, evidencePhotos);
+    return this.incidentService.addPhotos(id, agencyId, evidencePhotos, role);
   }
 
   @Delete(':incidentId/photos/:photoKey')
@@ -143,7 +146,8 @@ export class IncidentController {
     @Param('photoKey') photoKey: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.deletePhoto(id, agencyId, decodeURIComponent(photoKey));
+    const role = req.user.role;
+    return this.incidentService.deletePhoto(id, agencyId, decodeURIComponent(photoKey), role);
   }
 
   @Patch(':incidentId')
@@ -155,7 +159,8 @@ export class IncidentController {
     @Body() dto: UpdateIncidentDto,
   ) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.update(id, dto, agencyId);
+    const role = req.user.role;
+    return this.incidentService.update(id, dto, agencyId, role);
   }
 
   @Delete(':incidentId')
@@ -163,6 +168,7 @@ export class IncidentController {
   @ApiParam({ name: 'incidentId', description: 'Incident ObjectId' })
   remove(@Req() req, @Param('incidentId') id: string) {
     const agencyId = req.user.agencyId;
-    return this.incidentService.remove(id, agencyId);
+    const role = req.user.role;
+    return this.incidentService.remove(id, agencyId, role);
   }
 }

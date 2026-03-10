@@ -68,6 +68,7 @@ export class KmLogsController {
       agencyId,
       files.startOdometerPhoto[0],
       files.endOdometerPhoto[0],
+      req.user.role,
     );
   }
 
@@ -94,7 +95,7 @@ export class KmLogsController {
       tripType,
       fromDate,
       toDate,
-    });
+    }, req.user.role);
   }
 
   @Get(':logId')
@@ -102,7 +103,8 @@ export class KmLogsController {
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
   findOne(@Req() req, @Param('logId') logId: string) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.findOne(logId, agencyId);
+    const role = req.user.role;
+    return this.kmLogsService.findOne(logId, agencyId, role);
   }
 
   @Patch(':logId')
@@ -132,6 +134,7 @@ export class KmLogsController {
       agencyId,
       files?.startOdometerPhoto?.[0],
       files?.endOdometerPhoto?.[0],
+      req.user.role,
     );
   }
 
@@ -140,6 +143,7 @@ export class KmLogsController {
   @ApiParam({ name: 'logId', description: 'KM Log ID' })
   remove(@Req() req, @Param('logId') logId: string) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.remove(logId, agencyId);
+    const role = req.user.role;
+    return this.kmLogsService.remove(logId, agencyId, role);
   }
 }

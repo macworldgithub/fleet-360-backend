@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Subscription, SubscriptionDocument, BillingCycle, SubscriptionStatus } from './subscription.schema';
 import { CreateSubscriptionDto } from './create-subscription.dto';
 import { PlansService } from '../plans/plans.service';
@@ -51,12 +51,26 @@ export class SubscriptionsService {
     return subscription.save();
   }
 
-  async findAll(): Promise<Subscription[]> {
-    return this.subModel.find().exec();
+  async findAll(agencyId?: string, role?: string): Promise<Subscription[]> {
+    const isPrincipal = role === 'PRINCIPAL';
+    const filter: any = {};
+    
+    if (!isPrincipal && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    } else if (isPrincipal && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    return this.subModel.find(filter).exec();
   }
 
-  async findOne(id: string): Promise<Subscription> {
-    const sub = await this.subModel.findById(id);
+  async findOne(id: string, agencyId?: string, role?: string): Promise<Subscription> {
+    const filter: any = { _id: id };
+    if (role !== 'PRINCIPAL' && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const sub = await this.subModel.findOne(filter);
     if (!sub) throw new NotFoundException('Subscription not found');
     return sub;
   }

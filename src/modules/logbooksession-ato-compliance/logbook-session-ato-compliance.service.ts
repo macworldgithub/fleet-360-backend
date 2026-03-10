@@ -116,15 +116,16 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionById ──────────────────────────────────────────────────
 
-  async getSessionById(sessionId: string, agencyId: string) {
+  async getSessionById(sessionId: string, agencyId: string, role?: string) {
     this.validateObjectId(sessionId, 'sessionId');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const filter: any = { _id: new Types.ObjectId(sessionId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     const session = await this.sessionModel
-      .findOne({
-        _id: new Types.ObjectId(sessionId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .lean()
       .exec();
 
@@ -137,15 +138,16 @@ export class LogbookSessionAtoComplianceService {
 
   // ─── getSessionsByVehicle ────────────────────────────────────────────
 
-  async getSessionsByVehicle(vehicleId: string, agencyId: string) {
+  async getSessionsByVehicle(vehicleId: string, agencyId: string, role?: string) {
     this.validateObjectId(vehicleId, 'vehicleId');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const filter: any = { vehicleId: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     return this.sessionModel
-      .find({
-        vehicleId: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .find(filter)
       .sort({ startDate: -1 })
       .lean()
       .exec();

@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Vehicle, VehicleDocument, VehicleStatus, FuelType, LeaseType } from '../vehicles/schemas/vehicle.schema';
 import { Maintenance, MaintenanceDocument, MaintenanceStatus } from '../maintenance/schemas/maintenance.schema';
 import { LogbookSession, LogbookSessionDocument, LogbookSessionStatus } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
+import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 
 @Injectable()
 export class DashboardService {
@@ -11,10 +12,18 @@ export class DashboardService {
     @InjectModel(Vehicle.name) private vehicleModel: Model<VehicleDocument>,
     @InjectModel(Maintenance.name) private maintenanceModel: Model<MaintenanceDocument>,
     @InjectModel(LogbookSession.name) private logbookSessionModel: Model<LogbookSessionDocument>,
+    @InjectModel(Driver.name) private driverModel: Model<DriverDocument>,
   ) {}
 
-  async getStats(agencyId: string) {
-    const aid = new Types.ObjectId(agencyId);
+  async getStats(agencyId: string, role?: string) {
+    const aid = agencyId ? new Types.ObjectId(agencyId) : null;
+    const isPrincipal = role === 'PRINCIPAL';
+
+    // Helper to create filter
+    const getFilter = (additionalFilters: any = {}) => {
+      if (isPrincipal) return additionalFilters;
+      return { agencyId: aid, ...additionalFilters };
+    };
 
     const [
       totalVehicles,
@@ -39,34 +48,38 @@ export class DashboardService {
       // Logbook
       draftSessions,
       lockedSessions,
+      // Driver Stats
+      totalDrivers,
     ] = await Promise.all([
       // Vehicle Stats
-      this.vehicleModel.countDocuments({ agencyId: aid }),
-      this.vehicleModel.countDocuments({ agencyId: aid, vehicleStatus: VehicleStatus.ACTIVATE }),
-      this.vehicleModel.countDocuments({ agencyId: aid, vehicleStatus: VehicleStatus.ASSIGNED }),
-      this.vehicleModel.countDocuments({ agencyId: aid, vehicleStatus: VehicleStatus.UNDER_AGREEMENT }),
-      this.vehicleModel.countDocuments({ agencyId: aid, vehicleStatus: VehicleStatus.IN_MAINTENANCE }),
-      this.vehicleModel.countDocuments({ agencyId: aid, vehicleStatus: VehicleStatus.DEACTIVATE }),
+      this.vehicleModel.countDocuments(getFilter()),
+      this.vehicleModel.countDocuments(getFilter({ vehicleStatus: VehicleStatus.ACTIVATE })),
+      this.vehicleModel.countDocuments(getFilter({ vehicleStatus: VehicleStatus.ASSIGNED })),
+      this.vehicleModel.countDocuments(getFilter({ vehicleStatus: VehicleStatus.UNDER_AGREEMENT })),
+      this.vehicleModel.countDocuments(getFilter({ vehicleStatus: VehicleStatus.IN_MAINTENANCE })),
+      this.vehicleModel.countDocuments(getFilter({ vehicleStatus: VehicleStatus.DEACTIVATE })),
 
       // Fuel Distribution
-      this.vehicleModel.countDocuments({ agencyId: aid, fuelType: FuelType.PETROL }),
-      this.vehicleModel.countDocuments({ agencyId: aid, fuelType: FuelType.DIESEL }),
-      this.vehicleModel.countDocuments({ agencyId: aid, fuelType: FuelType.HYBRID }),
-      this.vehicleModel.countDocuments({ agencyId: aid, fuelType: FuelType.EV }),
+      this.vehicleModel.countDocuments(getFilter({ fuelType: FuelType.PETROL })),
+      this.vehicleModel.countDocuments(getFilter({ fuelType: FuelType.DIESEL })),
+      this.vehicleModel.countDocuments(getFilter({ fuelType: FuelType.HYBRID })),
+      this.vehicleModel.countDocuments(getFilter({ fuelType: FuelType.EV })),
 
       // Lease Distribution
-      this.vehicleModel.countDocuments({ agencyId: aid, leaseType: LeaseType.OWNED }),
-      this.vehicleModel.countDocuments({ agencyId: aid, leaseType: LeaseType.LOAN }),
+      this.vehicleModel.countDocuments(getFilter({ leaseType: LeaseType.OWNED })),
+      this.vehicleModel.countDocuments(getFilter({ leaseType: LeaseType.LOAN })),
 
       // Maintenance Stats
-      this.maintenanceModel.countDocuments({ agencyId: aid, status: MaintenanceStatus.SUBMITTED }),
-      this.maintenanceModel.countDocuments({ agencyId: aid, status: MaintenanceStatus.APPROVED }),
-      this.maintenanceModel.countDocuments({ agencyId: aid, status: MaintenanceStatus.REJECTED }),
-      this.maintenanceModel.countDocuments({ agencyId: aid, status: MaintenanceStatus.COMPLETED }),
+      this.maintenanceModel.countDocuments(getFilter({ status: MaintenanceStatus.SUBMITTED })),
+      this.maintenanceModel.countDocuments(getFilter({ status: MaintenanceStatus.APPROVED })),
+      this.maintenanceModel.countDocuments(getFilter({ status: MaintenanceStatus.REJECTED })),
+      this.maintenanceModel.countDocuments(getFilter({ status: MaintenanceStatus.COMPLETED })),
 
       // Logbook Session Stats
-      this.logbookSessionModel.countDocuments({ agencyId: aid, status: LogbookSessionStatus.DRAFT }),
-      this.logbookSessionModel.countDocuments({ agencyId: aid, status: LogbookSessionStatus.LOCKED }),
+      this.logbookSessionModel.countDocuments(getFilter({ status: LogbookSessionStatus.DRAFT })),
+      this.logbookSessionModel.countDocuments(getFilter({ status: LogbookSessionStatus.LOCKED })),
+      // Driver Stats
+      this.driverModel.countDocuments(getFilter()),
     ]);
 
     return {
@@ -97,6 +110,9 @@ export class DashboardService {
       logbookSessions: {
         draft: draftSessions,
         locked: lockedSessions,
+      },
+      drivers: {
+        total: totalDrivers,
       },
     };
   }

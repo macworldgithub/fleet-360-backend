@@ -14,9 +14,10 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get aggregated dashboard stats for the agency' })
   async getStats(@Req() req) {
     const agencyId = req.user.agencyId;
-    if (!agencyId) {
+    const role = req.user.role;
+    if (!agencyId && role !== 'PRINCIPAL') {
       throw new ForbiddenException('User is not associated with any agency');
     }
-    return this.dashboardService.getStats(agencyId);
+    return this.dashboardService.getStats(agencyId, role);
   }
 }

@@ -81,28 +81,34 @@ export class CostIntelligenceService {
   }
 
   // Agency Fleet Cost Summary
-  async getFleetCostSummary(agencyId: string) {
+  async getFleetCostSummary(agencyId: string, role?: string) {
+    const isPrincipal = role === 'PRINCIPAL';
     const objectId = new Types.ObjectId(agencyId);
+    
+    const matchQuery: any = {};
+    if (!isPrincipal) {
+      matchQuery.agencyId = objectId;
+    }
 
     const [fuel, maintenance, incidents, distance, vehicleCount] =
       await Promise.all([
         this.fuelModel.aggregate([
-          { $match: { agencyId: objectId, isDeleted: false } },
+          { $match: { ...matchQuery, isDeleted: false } },
           { $group: { _id: null, total: { $sum: '$totalCost' } } },
         ]),
         this.maintenanceModel.aggregate([
-          { $match: { agencyId: objectId, status: MaintenanceStatus.COMPLETED } },
+          { $match: { ...matchQuery, status: MaintenanceStatus.COMPLETED } },
           { $group: { _id: null, total: { $sum: '$actualCost' } } },
         ]),
         this.incidentModel.aggregate([
-          { $match: { agencyId: objectId, isDeleted: false } },
+          { $match: { ...matchQuery, isDeleted: false } },
           { $group: { _id: null, total: { $sum: '$estimatedRepairCost' } } },
         ]),
         this.kmLogModel.aggregate([
-          { $match: { agencyId: objectId } },
+          { $match: matchQuery },
           { $group: { _id: null, total: { $sum: '$distanceInKms' } } },
         ]),
-        this.vehicleModel.countDocuments({ agencyId: objectId }),
+        this.vehicleModel.countDocuments(matchQuery),
       ]);
 
     const fuelCost = fuel[0]?.total || 0;

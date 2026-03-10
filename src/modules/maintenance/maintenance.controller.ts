@@ -46,7 +46,8 @@ export class MaintenanceController {
   })
   findAll(@Req() req, @Query('status') status?: MaintenanceStatus) {
     const agencyId = req.user.agencyId;
-    return this.maintenanceService.findAll(agencyId, status);
+    const role = req.user.role;
+    return this.maintenanceService.findAll(agencyId, status, role);
   }
 
   @Post()
@@ -91,7 +92,9 @@ export class MaintenanceController {
   @Get('vehicle/:vehicleId')
   @ApiOperation({ summary: 'Get all maintenance records for a vehicle' })
   @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
-  findByVehicle(@Param('vehicleId') vehicleId: string) {
-    return this.maintenanceService.findByVehicle(vehicleId);
+  findByVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
+    const agencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.maintenanceService.findByVehicle(vehicleId, agencyId, role);
   }
 }

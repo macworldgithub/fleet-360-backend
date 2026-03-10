@@ -83,15 +83,18 @@ export class KmLogsService {
     agencyId: string,
     startPhoto: Express.Multer.File,
     endPhoto: Express.Multer.File,
+    role?: string,
   ) {
     this.validateObjectId(dto.vehicleId, 'vehicleId');
-    this.validateObjectId(agencyId, 'agencyId');
+
+    const isPrincipal = role === 'PRINCIPAL';
+    const filter: any = { _id: new Types.ObjectId(dto.vehicleId) };
+    if (!isPrincipal) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     // 1. Validate Vehicle Status & Ownership
-    const vehicle = await this.vehicleModel.findOne({
-      _id: new Types.ObjectId(dto.vehicleId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found in your agency');
@@ -202,8 +205,9 @@ export class KmLogsService {
     return log;
   }
 
-  async findAll(filters: any) {
+  async findAll(filters: any, role?: string) {
     const query: any = {};
+    const isPrincipal = role === 'PRINCIPAL';
 
     if (filters.vehicleId) {
       this.validateObjectId(filters.vehicleId, 'vehicleId');
@@ -215,7 +219,13 @@ export class KmLogsService {
       query.officeId = new Types.ObjectId(filters.officeId);
     }
 
-    if (filters.agencyId) {
+    if (!isPrincipal) {
+      if (filters.agencyId) {
+        this.validateObjectId(filters.agencyId, 'agencyId');
+        query.agencyId = new Types.ObjectId(filters.agencyId);
+      }
+    } else if (filters.agencyId) {
+      // Principal can still filter by a specific agency if they want
       this.validateObjectId(filters.agencyId, 'agencyId');
       query.agencyId = new Types.ObjectId(filters.agencyId);
     }
@@ -235,13 +245,15 @@ export class KmLogsService {
     return Promise.all(logs.map((log) => this.getLogWithSignedUrls(log)));
   }
 
-  async findOne(logId: string, agencyId: string) {
+  async findOne(logId: string, agencyId: string, role?: string) {
     this.validateObjectId(logId, 'logId');
 
-    const log = await this.kmLogModel.findOne({
-      _id: new Types.ObjectId(logId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(logId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const log = await this.kmLogModel.findOne(filter).exec();
 
     if (!log) throw new NotFoundException('KM Log not found');
 
@@ -254,13 +266,16 @@ export class KmLogsService {
     agencyId: string,
     startPhoto?: Express.Multer.File,
     endPhoto?: Express.Multer.File,
+    role?: string,
   ) {
     this.validateObjectId(logId, 'logId');
 
-    const existing = await this.kmLogModel.findOne({
-      _id: new Types.ObjectId(logId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(logId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const existing = await this.kmLogModel.findOne(filter).exec();
     
     if (!existing) {
       throw new NotFoundException('KM Log not found');
@@ -307,7 +322,7 @@ export class KmLogsService {
 
     const updated = await this.kmLogModel
       .findOneAndUpdate(
-        { _id: new Types.ObjectId(logId), agencyId: new Types.ObjectId(agencyId) },
+        filter,
         {
           $set: updatePayload,
         },
@@ -317,8 +332,12 @@ export class KmLogsService {
 
     // Sync vehicle odometer if the updated log is the latest trip (optional optimization, but here we update for consistency)
     if (updated) {
+      const vehicleFilter: any = { _id: updated.vehicleId };
+      if (role !== 'PRINCIPAL') {
+        vehicleFilter.agencyId = new Types.ObjectId(agencyId);
+      }
       await this.vehicleModel.updateOne(
-        { _id: updated.vehicleId, agencyId: new Types.ObjectId(agencyId) },
+        vehicleFilter,
         { $set: { odometerInKms: updated.endOdometerInKms } }
       ).exec();
     }
@@ -330,13 +349,15 @@ export class KmLogsService {
     return this.getLogWithSignedUrls(updated);
   }
 
-  async remove(logId: string, agencyId: string) {
+  async remove(logId: string, agencyId: string, role?: string) {
     this.validateObjectId(logId, 'logId');
 
-    const deleted = await this.kmLogModel.findOneAndDelete({
-      _id: new Types.ObjectId(logId),
-      agencyId: new Types.ObjectId(agencyId),
-    }).exec();
+    const filter: any = { _id: new Types.ObjectId(logId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
+    const deleted = await this.kmLogModel.findOneAndDelete(filter).exec();
 
     if (!deleted) {
       throw new NotFoundException('KM Log not found');
@@ -393,9 +414,13 @@ export class KmLogsService {
     }
 
     // ── 2. Revert Vehicle Odometer (Rollback) ──
-    // Find the latest trip for this vehicle in the ENTIRE system after deletion
+    const latestRemainingTripFilter: any = { vehicleId: deleted.vehicleId };
+    if (role !== 'PRINCIPAL') {
+      latestRemainingTripFilter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const latestRemainingTrip = await this.kmLogModel
-      .findOne({ vehicleId: deleted.vehicleId, agencyId: new Types.ObjectId(agencyId) })
+      .findOne(latestRemainingTripFilter)
       .sort({ tripDate: -1, createdAt: -1 })
       .exec();
 

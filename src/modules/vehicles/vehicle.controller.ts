@@ -81,14 +81,16 @@ export class VehicleController {
   })
   findAll(@Req() req, @Query('officeId') officeId?: string) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.findAll(agencyId, officeId);
+    const role = req.user.role;
+    return this.vehicleService.findAll(agencyId, officeId, role);
   }
 
   @Get(':vehicleId')
   @ApiOperation({ summary: 'Get a vehicle by ID' })
   findOne(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.findOne(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.findOne(vehicleId, agencyId, role);
   }
 
   @Patch(':vehicleId')
@@ -99,14 +101,16 @@ export class VehicleController {
     @Body() updateVehicleDto: UpdateVehicleDto,
   ) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.update(vehicleId, updateVehicleDto, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.update(vehicleId, updateVehicleDto, agencyId, role);
   }
 
   @Delete(':vehicleId')
   @ApiOperation({ summary: 'Delete a Vehicle' })
   remove(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.remove(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.remove(vehicleId, agencyId, role);
   }
 
   @Patch(':vehicleId/toggle-status')
@@ -115,7 +119,8 @@ export class VehicleController {
   })
   toggleStatus(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.toggleStatus(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.toggleStatus(vehicleId, agencyId, role);
   }
 
   @Patch(':vehicleId/loan-repayment')
@@ -128,7 +133,8 @@ export class VehicleController {
     @Body() dto: LoanRepaymentDto,
   ) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.makeLoanRepayment(vehicleId, dto.amount, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.makeLoanRepayment(vehicleId, dto.amount, agencyId, role);
   }
 
   @Get(':vehicleId/loan-history')
@@ -137,7 +143,8 @@ export class VehicleController {
   })
   getLoanHistory(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.getLoanRepaymentHistory(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.getLoanRepaymentHistory(vehicleId, agencyId, role);
   }
 
   @Patch(':vehicleId/photos')
@@ -161,11 +168,13 @@ export class VehicleController {
     },
   ) {
     const agencyId = req.user.agencyId;
+    const role = req.user.role;
     return this.vehicleService.updateVehiclePhotos(
       vehicleId,
       agencyId,
       files?.displayPhoto?.[0],
       files?.addPhotos,
+      role,
     );
   }
 
@@ -179,6 +188,7 @@ export class VehicleController {
     @Body() dto: RemoveVehiclePhotosDto,
   ) {
     const agencyId = req.user.agencyId;
-    return this.vehicleService.removeVehiclePhotos(vehicleId, dto, agencyId);
+    const role = req.user.role;
+    return this.vehicleService.removeVehiclePhotos(vehicleId, dto, agencyId, role);
   }
 }

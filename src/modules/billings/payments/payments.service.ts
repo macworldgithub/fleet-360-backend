@@ -1,7 +1,7 @@
 // payments.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Payment, PaymentDocument, PaymentStatus } from './payment.schema';
 
 @Injectable()
@@ -15,9 +15,18 @@ export class PaymentsService {
     return payment.save();
   }
 
-  async findAllWithSubscription(): Promise<Payment[]> {
+  async findAllWithSubscription(agencyId?: string, role?: string): Promise<Payment[]> {
+    const isPrincipal = role === 'PRINCIPAL';
+    const filter: any = {};
+    
+    if (!isPrincipal && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    } else if (isPrincipal && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     return this.payModel
-      .find()
+      .find(filter)
       .populate({
         path: 'subscriptionId',      
         populate: [
@@ -28,9 +37,14 @@ export class PaymentsService {
       .exec();
   }
 
-  async findOneWithSubscription(id: string): Promise<Payment | null> {
+  async findOneWithSubscription(id: string, agencyId?: string, role?: string): Promise<Payment | null> {
+    const filter: any = { _id: id };
+    if (role !== 'PRINCIPAL' && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     return this.payModel
-      .findById(id)
+      .findOne(filter)
       .populate({
         path: 'subscriptionId',
         populate: [

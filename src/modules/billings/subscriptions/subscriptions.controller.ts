@@ -1,7 +1,12 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { CreateSubscriptionDto } from './create-subscription.dto';
 
+@ApiTags('Subscriptions')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('subscriptions')
 export class SubscriptionsController {
   constructor(private readonly subService: SubscriptionsService) {}
@@ -12,12 +17,16 @@ export class SubscriptionsController {
   }
 
   @Get()
-  findAll() {
-    return this.subService.findAll();
+  findAll(@Req() req) {
+    const agencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.subService.findAll(agencyId, role);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.subService.findOne(id);
+  findOne(@Req() req, @Param('id') id: string) {
+    const agencyId = req.user.agencyId;
+    const role = req.user.role;
+    return this.subService.findOne(id, agencyId, role);
   }
 }

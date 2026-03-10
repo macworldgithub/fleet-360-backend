@@ -33,20 +33,16 @@ export class DriverController {
   @ApiOperation({ summary: 'Get all drivers for the agency' })
   findAll(@Req() req) {
     const agencyId = req.user.agencyId;
-    if (!agencyId) {
-      throw new ForbiddenException('User is not associated with any agency');
-    }
-    return this.driverService.findAll(agencyId);
+    const role = req.user.role;
+    return this.driverService.findAll(agencyId, role);
   }
 
   @Get(':driverId')
   @ApiOperation({ summary: 'Get a driver by ID' })
   findOne(@Req() req, @Param('driverId') driverId: string) {
     const agencyId = req.user.agencyId;
-    if (!agencyId) {
-      throw new ForbiddenException('User is not associated with any agency');
-    }
-    return this.driverService.findOne(driverId, agencyId);
+    const role = req.user.role;
+    return this.driverService.findOne(driverId, agencyId, role);
   }
 
   @Get(':driverId/profile-picture')
@@ -54,7 +50,8 @@ export class DriverController {
   @ApiParam({ name: 'driverId', description: 'Driver ID' })
   async getProfilePicture(@Req() req, @Param('driverId') driverId: string) {
     const agencyId = req.user.agencyId;
-    const url = await this.driverService.getProfilePictureUrl(driverId, agencyId);
+    const role = req.user.role;
+    const url = await this.driverService.getProfilePictureUrl(driverId, agencyId, role);
     return { url };
   }
 
@@ -69,7 +66,8 @@ export class DriverController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const agencyId = req.user.agencyId;
-    return this.driverService.update(driverId, updateDriverDto, agencyId, file);
+    const role = req.user.role;
+    return this.driverService.update(driverId, updateDriverDto, agencyId, file, role);
   }
 
   @Delete(':driverId')
@@ -77,7 +75,8 @@ export class DriverController {
   @ApiOperation({ summary: 'Delete a driver permanently' })
   async remove(@Req() req, @Param('driverId') driverId: string) {
     const agencyId = req.user.agencyId;
-    await this.driverService.remove(driverId, agencyId);
+    const role = req.user.role;
+    await this.driverService.remove(driverId, agencyId, role);
     return { message: 'Driver deleted successfully' };
   }
 
@@ -91,7 +90,8 @@ export class DriverController {
     @Param('vehicleId') vehicleId: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.driverService.assignVehicle(driverId, vehicleId, agencyId);
+    const role = req.user.role;
+    return this.driverService.assignVehicle(driverId, vehicleId, agencyId, role);
   }
 
   @Post(':driverId/unassign-vehicle/:vehicleId')
@@ -102,7 +102,8 @@ export class DriverController {
     @Param('vehicleId') vehicleId: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.driverService.unassignVehicle(driverId, vehicleId, agencyId);
+    const role = req.user.role;
+    return this.driverService.unassignVehicle(driverId, vehicleId, agencyId, role);
   }
 
   // ─── Vehicle Request / Approval Workflow ─────────────────────────────────────
@@ -116,20 +117,23 @@ export class DriverController {
     @Param('vehicleId') vehicleId: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.driverService.requestVehicle(vehicleId, driverId, agencyId);
+    const role = req.user.role;
+    return this.driverService.requestVehicle(vehicleId, driverId, agencyId, role);
   }
 
   @Patch('approve-vehicle/:vehicleId')
   @ApiOperation({ summary: 'Approve a vehicle request' })
   approveVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.driverService.approveVehicle(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.driverService.approveVehicle(vehicleId, agencyId, role);
   }
 
   @Patch('reject-vehicle/:vehicleId')
   @ApiOperation({ summary: 'Reject a vehicle request' })
   rejectVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.driverService.rejectVehicle(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.driverService.rejectVehicle(vehicleId, agencyId, role);
   }
 }

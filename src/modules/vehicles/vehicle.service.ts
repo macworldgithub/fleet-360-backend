@@ -150,8 +150,14 @@ export class VehicleService {
   async findAll(
     agencyId: string,
     officeId?: string,
+    role?: string,
   ): Promise<VehicleDocument[]> {
-    const filter: any = { agencyId: new Types.ObjectId(agencyId) };
+    const isPrincipal = role === 'PRINCIPAL';
+    const filter: any = {};
+    
+    if (!isPrincipal) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     if (officeId) {
       this.validateObjectId(officeId, 'officeId');
@@ -161,14 +167,16 @@ export class VehicleService {
     return this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
   }
 
-  async findOne(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
+  async findOne(vehicleId: string, agencyId: string, role?: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -182,6 +190,7 @@ export class VehicleService {
     vehicleId: string,
     updateVehicleDto: UpdateVehicleDto,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
@@ -201,12 +210,14 @@ export class VehicleService {
       updateData.officeId = new Types.ObjectId(updateVehicleDto.officeId);
     }
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
+        filter,
         { $set: updateData },
         { new: true },
       )
@@ -219,15 +230,17 @@ export class VehicleService {
     return vehicle;
   }
 
-  async remove(vehicleId: string, agencyId: string): Promise<VehicleDocument> {
+  async remove(vehicleId: string, agencyId: string, role?: string): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
+
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
 
     // 1. Find the vehicle
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -263,14 +276,17 @@ export class VehicleService {
   async toggleStatus(
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -296,14 +312,17 @@ export class VehicleService {
     vehicleId: string,
     amount: number,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -344,8 +363,9 @@ export class VehicleService {
   async getLoanRepaymentHistory(
     vehicleId: string,
     agencyId: string,
+    role?: string,
   ): Promise<any[]> {
-    const vehicle = await this.findOne(vehicleId, agencyId);
+    const vehicle = await this.findOne(vehicleId, agencyId, role);
     return vehicle.loanRepaymentHistory || [];
   }
 
@@ -354,14 +374,17 @@ export class VehicleService {
     agencyId: string,
     displayPhoto?: Express.Multer.File,
     addPhotos?: Express.Multer.File[],
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -411,10 +434,7 @@ export class VehicleService {
 
     const updated = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
+        filter,
         updateQuery,
         { new: true },
       )
@@ -431,14 +451,17 @@ export class VehicleService {
     vehicleId: string,
     dto: RemoveVehiclePhotosDto,
     agencyId: string,
+    role?: string,
   ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
+    const filter: any = { _id: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL') {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     const vehicle = await this.vehicleModel
-      .findOne({
-        _id: new Types.ObjectId(vehicleId),
-        agencyId: new Types.ObjectId(agencyId),
-      })
+      .findOne(filter)
       .exec();
 
     if (!vehicle) {
@@ -462,10 +485,7 @@ export class VehicleService {
 
     const updatedVehicle = await this.vehicleModel
       .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(vehicleId),
-          agencyId: new Types.ObjectId(agencyId),
-        },
+        filter,
         updateQuery,
         { new: true },
       )

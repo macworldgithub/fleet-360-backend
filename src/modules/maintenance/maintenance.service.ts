@@ -430,11 +430,16 @@ export class MaintenanceService {
 
   // ===================== GET ALL FOR VEHICLE =====================
 
-  async findByVehicle(vehicleId: string): Promise<MaintenanceDocument[]> {
+  async findByVehicle(vehicleId: string, agencyId?: string, role?: string): Promise<MaintenanceDocument[]> {
     this.validateObjectId(vehicleId, 'vehicleId');
 
+    const filter: any = { vehicleId: new Types.ObjectId(vehicleId) };
+    if (role !== 'PRINCIPAL' && agencyId) {
+      filter.agencyId = new Types.ObjectId(agencyId);
+    }
+
     return this.maintenanceModel
-      .find({ vehicleId: new Types.ObjectId(vehicleId) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .exec();
   }
@@ -442,8 +447,14 @@ export class MaintenanceService {
   async findAll(
     agencyId: string,
     status?: MaintenanceStatus,
+    role?: string,
   ): Promise<MaintenanceDocument[]> {
-    const query: any = { agencyId: new Types.ObjectId(agencyId) };
+    const isPrincipal = role === 'PRINCIPAL';
+    const query: any = {};
+
+    if (!isPrincipal) {
+      query.agencyId = new Types.ObjectId(agencyId);
+    }
 
     if (status) {
       query.status = status;

@@ -47,7 +47,8 @@ export class LogbookSessionAtoComplianceController {
   @ApiParam({ name: 'id', description: 'Logbook Session ID' })
   findOne(@Req() req, @Param('id') id: string) {
     const agencyId = req.user.agencyId;
-    return this.service.getSessionById(id, agencyId);
+    const role = req.user.role;
+    return this.service.getSessionById(id, agencyId, role);
   }
 
   @Get('vehicle/:vehicleId')
@@ -58,6 +59,7 @@ export class LogbookSessionAtoComplianceController {
   @ApiParam({ name: 'vehicleId', description: 'Vehicle ObjectId' })
   findByVehicle(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
-    return this.service.getSessionsByVehicle(vehicleId, agencyId);
+    const role = req.user.role;
+    return this.service.getSessionsByVehicle(vehicleId, agencyId, role);
   }
 }
