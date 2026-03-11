@@ -46,8 +46,12 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     CostIntelligenceModule,
     AwsModule,
     BillingModule,
+<<<<<<< HEAD
     DashboardModule,
     NotificationsModule
+=======
+    DashboardModule
+>>>>>>> bc11eada395c98462e924acc720f915ff93887cb
   ],
 })
 export class AppModule {}
