@@ -90,7 +90,7 @@ export class IncidentController {
   findOne(@Req() req, @Param('incidentId') id: string) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.incidentService.findOne(id, agencyId, role);
+    return this.incidentService.getOne(id, agencyId, role);
   }
 
   @Get(':incidentId/photos')

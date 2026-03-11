@@ -142,9 +142,31 @@ export class VehicleService {
     );
 
     return {
-      vehicle: saved,
+      vehicle: await this.attachPhotoUrls(saved),
       logbookSessionId: newSession._id,
     };
+  }
+
+  private async attachPhotoUrls(vehicle: VehicleDocument): Promise<any> {
+    const obj = vehicle.toObject();
+    
+    // Display Photo
+    if (obj.displayPhoto) {
+      obj['displayPhotoUrl'] = await this.awsService.getSignedUrl(obj.displayPhoto);
+    } else {
+      obj['displayPhotoUrl'] = null;
+    }
+
+    // Gallery Photos
+    if (obj.vehiclePhotos && obj.vehiclePhotos.length > 0) {
+      obj['vehiclePhotoUrls'] = await Promise.all(
+        obj.vehiclePhotos.map(key => this.awsService.getSignedUrl(key))
+      );
+    } else {
+      obj['vehiclePhotoUrls'] = [];
+    }
+
+    return obj;
   }
 
   async findAll(
@@ -164,10 +186,11 @@ export class VehicleService {
       filter.officeId = new Types.ObjectId(officeId);
     }
 
-    return this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
+    const vehicles = await this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
+    return Promise.all(vehicles.map(v => this.attachPhotoUrls(v)));
   }
 
-  async findOne(vehicleId: string, agencyId: string, role?: string): Promise<VehicleDocument> {
+  async findOne(vehicleId: string, agencyId: string, role?: string): Promise<any> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const filter: any = { _id: new Types.ObjectId(vehicleId) };
@@ -183,7 +206,7 @@ export class VehicleService {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
-    return vehicle;
+    return this.attachPhotoUrls(vehicle);
   }
 
   async update(
@@ -191,7 +214,7 @@ export class VehicleService {
     updateVehicleDto: UpdateVehicleDto,
     agencyId: string,
     role?: string,
-  ): Promise<VehicleDocument> {
+  ): Promise<any> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const updateData: any = { ...updateVehicleDto };
@@ -227,7 +250,7 @@ export class VehicleService {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
-    return vehicle;
+    return this.attachPhotoUrls(vehicle);
   }
 
   async remove(vehicleId: string, agencyId: string, role?: string): Promise<VehicleDocument> {
@@ -375,7 +398,7 @@ export class VehicleService {
     displayPhoto?: Express.Multer.File,
     addPhotos?: Express.Multer.File[],
     role?: string,
-  ): Promise<VehicleDocument> {
+  ): Promise<any> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const filter: any = { _id: new Types.ObjectId(vehicleId) };
@@ -444,7 +467,7 @@ export class VehicleService {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found after update`);
     }
 
-    return updated;
+    return this.attachPhotoUrls(updated);
   }
 
   async removeVehiclePhotos(
@@ -452,7 +475,7 @@ export class VehicleService {
     dto: RemoveVehiclePhotosDto,
     agencyId: string,
     role?: string,
-  ): Promise<VehicleDocument> {
+  ): Promise<any> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const filter: any = { _id: new Types.ObjectId(vehicleId) };
@@ -503,6 +526,6 @@ export class VehicleService {
       });
     }
 
-    return updatedVehicle;
+    return this.attachPhotoUrls(updatedVehicle);
   }
 }

@@ -32,6 +32,16 @@ export class DriverService {
     }
   }
 
+  private async attachPhotoUrls(driver: DriverDocument): Promise<any> {
+    const obj = driver.toObject();
+    if (obj.profilePicture) {
+      obj['profilePictureUrl'] = await this.awsService.getSignedUrl(obj.profilePicture);
+    } else {
+      obj['profilePictureUrl'] = null;
+    }
+    return obj;
+  }
+
   findByEmail(email: string): Promise<DriverDocument | null> {
     return this.driverModel
       .findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } })
@@ -47,7 +57,7 @@ export class DriverService {
     },
     agencyId: string,
     file?: Express.Multer.File,
-  ): Promise<DriverDocument> {
+  ): Promise<any> {
     this.validateObjectId(agencyId, 'agencyId');
 
     const driver = new this.driverModel({
@@ -63,10 +73,11 @@ export class DriverService {
       driver.profilePicture = key;
     }
 
-    return driver.save();
+    const saved = await driver.save();
+    return this.attachPhotoUrls(saved);
   }
 
-  async findAll(agencyId: string, role?: string): Promise<DriverDocument[]> {
+  async findAll(agencyId: string, role?: string): Promise<any[]> {
     const isPrincipal = role === 'PRINCIPAL';
     const filter: any = {};
     
@@ -75,14 +86,16 @@ export class DriverService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    return this.driverModel
+    const drivers = await this.driverModel
       .find(filter)
       .populate('assignedVehicle')
       .sort({ createdAt: -1 })
       .exec();
+
+    return Promise.all(drivers.map(d => this.attachPhotoUrls(d)));
   }
 
-  async findOne(driverId: string, agencyId: string, role?: string): Promise<DriverDocument> {
+  async findOne(driverId: string, agencyId: string, role?: string): Promise<any> {
     this.validateObjectId(driverId, 'Driver ID');
 
     const filter: any = { _id: new Types.ObjectId(driverId) };
@@ -99,7 +112,7 @@ export class DriverService {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
     }
 
-    return driver;
+    return this.attachPhotoUrls(driver);
   }
 
   async getProfilePictureUrl(driverId: string, agencyId: string, role?: string): Promise<string | null> {
@@ -114,7 +127,7 @@ export class DriverService {
     agencyId: string,
     file?: Express.Multer.File,
     role?: string,
-  ): Promise<DriverDocument> {
+  ): Promise<any> {
     this.validateObjectId(driverId, 'Driver ID');
     this.validateObjectId(agencyId, 'agencyId');
 
@@ -152,9 +165,7 @@ export class DriverService {
     if (updateDriverDto.driverLicenseNumber) driver.driverLicenseNumber = updateDriverDto.driverLicenseNumber;
 
     const updated = await driver.save();
-    const result = await this.driverModel.findById(updated._id).populate('assignedVehicle').exec();
-    if (!result) throw new NotFoundException('Driver not found after update');
-    return result;
+    return this.attachPhotoUrls(updated);
   }
 
   async remove(driverId: string, agencyId: string, role?: string): Promise<void> {

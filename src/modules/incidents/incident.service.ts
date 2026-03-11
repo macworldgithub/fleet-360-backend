@@ -65,7 +65,19 @@ export class IncidentService {
       await incident.save();
     }
 
-    return incident;
+    return this.attachPhotoUrls(incident);
+  }
+
+  private async attachPhotoUrls(incident: IncidentDocument): Promise<any> {
+    const obj = incident.toObject();
+    if (obj.evidencePhotos && obj.evidencePhotos.length > 0) {
+      obj['evidencePhotoUrls'] = await Promise.all(
+        obj.evidencePhotos.map((key) => this.awsService.getSignedUrl(key)),
+      );
+    } else {
+      obj['evidencePhotoUrls'] = [];
+    }
+    return obj;
   }
 
   async findAll(agencyId: string, vehicleId?: string, role?: string) {
@@ -80,7 +92,13 @@ export class IncidentService {
 
     if (vehicleId) query.vehicleId = new Types.ObjectId(vehicleId);
 
-    return this.incidentModel.find(query).sort({ createdAt: -1 }).exec();
+    const incidents = await this.incidentModel.find(query).sort({ createdAt: -1 }).exec();
+    return Promise.all(incidents.map(incident => this.attachPhotoUrls(incident)));
+  }
+
+  async getOne(id: string, agencyId: string, role?: string) {
+    const incident = await this.findOne(id, agencyId, role);
+    return this.attachPhotoUrls(incident);
   }
 
   async findOne(id: string, agencyId: string, role?: string) {
@@ -125,7 +143,7 @@ export class IncidentService {
     agencyId: string,
     evidencePhotos: Express.Multer.File[],
     role?: string,
-  ): Promise<IncidentDocument> {
+  ): Promise<any> {
     const incident = await this.findOne(id, agencyId, role);
 
     const uploadedKeys: string[] = [];
@@ -143,13 +161,13 @@ export class IncidentService {
     ];
     await incident.save();
 
-    return incident;
+    return this.attachPhotoUrls(incident);
   }
 
   /**
    * Delete a specific photo from an incident.
    */
-  async deletePhoto(id: string, agencyId: string, photoKey: string, role?: string): Promise<IncidentDocument> {
+  async deletePhoto(id: string, agencyId: string, photoKey: string, role?: string): Promise<any> {
     const incident = await this.findOne(id, agencyId, role);
 
     if (!incident.evidencePhotos?.includes(photoKey)) {
@@ -165,7 +183,7 @@ export class IncidentService {
     );
     await incident.save();
 
-    return incident;
+    return this.attachPhotoUrls(incident);
   }
 
   async update(id: string, dto: UpdateIncidentDto, agencyId: string, role?: string) {
@@ -183,7 +201,7 @@ export class IncidentService {
     ).exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
-    return incident;
+    return this.attachPhotoUrls(incident);
   }
 
   async remove(id: string, agencyId: string, role?: string) {
@@ -201,6 +219,6 @@ export class IncidentService {
     ).exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
-    return incident;
+    return this.attachPhotoUrls(incident);
   }
 }

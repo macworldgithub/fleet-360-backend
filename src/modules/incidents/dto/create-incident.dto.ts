@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IncidentType, IncidentStatus } from '../schemas/incident.schema';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateIncidentDto {
   @ApiProperty({ enum: IncidentType })
@@ -37,11 +38,13 @@ export class CreateIncidentDto {
   @ApiPropertyOptional({ example: 3500 })
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   estimatedRepairCost?: number;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
   insuranceClaimFiled?: boolean;
 
   @ApiPropertyOptional({ example: 'PR-12345' })
