@@ -65,6 +65,11 @@ export class CreateVehicleDto {
   @IsOptional()
   purchaseDate?: string;
 
+  @ApiPropertyOptional({ example: '2026-01-15' })
+  @IsDateString()
+  @IsOptional()
+  registrationExpiryDate?: string;
+
   @ApiPropertyOptional({ example: 25000 })
   @IsNumber()
   @IsOptional()
