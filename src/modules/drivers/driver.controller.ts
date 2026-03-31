@@ -15,7 +15,13 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiConsumes, ApiParam } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiConsumes,
+  ApiParam,
+} from '@nestjs/swagger';
 import { DriverService } from './driver.service';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -51,12 +57,18 @@ export class DriverController {
   async getProfilePicture(@Req() req, @Param('driverId') driverId: string) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    const url = await this.driverService.getProfilePictureUrl(driverId, agencyId, role);
+    const url = await this.driverService.getProfilePictureUrl(
+      driverId,
+      agencyId,
+      role,
+    );
     return { url };
   }
 
   @Patch(':driverId')
-  @ApiOperation({ summary: 'Update a driver by ID (with optional profile picture)' })
+  @ApiOperation({
+    summary: 'Update a driver by ID (with optional profile picture)',
+  })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('profilePicture'))
   update(
@@ -67,7 +79,13 @@ export class DriverController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.driverService.update(driverId, updateDriverDto, agencyId, file, role);
+    return this.driverService.update(
+      driverId,
+      updateDriverDto,
+      agencyId,
+      file,
+      role,
+    );
   }
 
   @Delete(':driverId')
@@ -91,7 +109,12 @@ export class DriverController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.driverService.assignVehicle(driverId, vehicleId, agencyId, role);
+    return this.driverService.assignVehicle(
+      driverId,
+      vehicleId,
+      agencyId,
+      role,
+    );
   }
 
   @Post(':driverId/unassign-vehicle/:vehicleId')
@@ -103,7 +126,12 @@ export class DriverController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.driverService.unassignVehicle(driverId, vehicleId, agencyId, role);
+    return this.driverService.unassignVehicle(
+      driverId,
+      vehicleId,
+      agencyId,
+      role,
+    );
   }
 
   // ─── Vehicle Request / Approval Workflow ─────────────────────────────────────
@@ -118,7 +146,12 @@ export class DriverController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.driverService.requestVehicle(vehicleId, driverId, agencyId, role);
+    return this.driverService.requestVehicle(
+      vehicleId,
+      driverId,
+      agencyId,
+      role,
+    );
   }
 
   @Patch('approve-vehicle/:vehicleId')
@@ -135,5 +168,13 @@ export class DriverController {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
     return this.driverService.rejectVehicle(vehicleId, agencyId, role);
+  }
+
+  @Post('register-device-token')
+  async registerDeviceToken(
+    @Body('driverId') driverId: string,
+    @Body('token') token: string,
+  ) {
+    return this.driverService.registerDeviceToken(driverId, token);
   }
 }

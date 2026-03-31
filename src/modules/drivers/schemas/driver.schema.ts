@@ -25,6 +25,9 @@ export class Driver {
 
   @Prop({ type: String, default: null })
   profilePicture: string | null;
+
+  @Prop({ type: [String], default: [] })
+  deviceTokens: string[];
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
