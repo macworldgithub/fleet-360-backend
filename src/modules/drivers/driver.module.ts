@@ -6,6 +6,7 @@ import { DriverService } from './driver.service';
 import { DriverController } from './driver.controller';
 import { AwsModule } from '../../aws/aws.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { LicenseCronService } from './license-cron.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     NotificationModule,
   ],
   controllers: [DriverController],
-  providers: [DriverService],
+  providers: [DriverService, LicenseCronService],
   exports: [DriverService],
 })
 export class DriverModule {}

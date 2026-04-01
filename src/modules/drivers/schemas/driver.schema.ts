@@ -20,6 +20,9 @@ export class Driver {
   @Prop({ required: true, unique: true, trim: true })
   driverLicenseNumber: string;
 
+  @Prop()
+  licenseExpiryDate: Date;
+
   @Prop({ type: Types.ObjectId, ref: 'Vehicle', default: null })
   assignedVehicle: Types.ObjectId | null;
 

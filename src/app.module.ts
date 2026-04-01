@@ -18,6 +18,7 @@ import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelli
 import { BillingModule } from './modules/billings/billing.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { NotificationModule } from './notification/notification.module';
     BillingModule,
     DashboardModule,
     NotificationModule,
+    ScheduleModule.forRoot(), 
   ],
 })
 export class AppModule {}
