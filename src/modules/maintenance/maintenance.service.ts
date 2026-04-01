@@ -17,13 +17,18 @@ import {
   LogbookSession,
   LogbookSessionDocument,
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
-import { Vehicle, VehicleDocument, VehicleStatus } from '../vehicles/schemas/vehicle.schema';
+import {
+  Vehicle,
+  VehicleDocument,
+  VehicleStatus,
+} from '../vehicles/schemas/vehicle.schema';
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { AgencyRole } from '../../agencies/schemas/agency.schema';
 import { AwsService } from '../../aws/aws.service';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
+import { NotificationService } from 'src/notification/notification.service';
 
 const PREVENTIVE_INTERVAL_KM = 5000;
 const SNOOZE_INTERVAL_KM = 500;
@@ -43,6 +48,7 @@ export class MaintenanceService {
     @InjectModel(Driver.name)
     private driverModel: Model<DriverDocument>,
     private readonly awsService: AwsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -59,15 +65,19 @@ export class MaintenanceService {
     agencyId: string,
     files?: Express.Multer.File[],
   ): Promise<MaintenanceDocument> {
-    this.logger.log(`Creating maintenance: vehicleId=${dto.vehicleId}, userId=${userId}, agencyId=${agencyId}`);
-    
+    this.logger.log(
+      `Creating maintenance: vehicleId=${dto.vehicleId}, userId=${userId}, agencyId=${agencyId}`,
+    );
+
     this.validateObjectId(dto.vehicleId, 'vehicleId');
     if (userId) this.validateObjectId(userId, 'userId');
     if (agencyId) this.validateObjectId(agencyId, 'agencyId');
-    
+
     if (!agencyId) {
       this.logger.error('agencyId is missing in create maintenance request');
-      throw new BadRequestException('agencyId is required to create maintenance');
+      throw new BadRequestException(
+        'agencyId is required to create maintenance',
+      );
     }
 
     // Find latest logbook session for the vehicle
@@ -83,7 +93,9 @@ export class MaintenanceService {
       );
     }
 
-    this.logger.log(`Found latest session: id=${latestSession._id}, endOdometerInKms=${latestSession.endOdometerInKms}`);
+    this.logger.log(
+      `Found latest session: id=${latestSession._id}, endOdometerInKms=${latestSession.endOdometerInKms}`,
+    );
 
     try {
       const maintenance = new this.maintenanceModel({
@@ -118,13 +130,27 @@ export class MaintenanceService {
         $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
       });
 
+      // Notify Admin
+      await this.notificationService.notifyAdmins({
+        agencyId,
+        title: 'New Maintenance Request',
+        message: `Vehicle maintenance requested (${dto.maintenanceType})`,
+        type: 'MAINTENANCE_REQUEST',
+        meta: {
+          vehicleId: dto.vehicleId,
+          maintenanceId: savedFinal._id,
+        },
+      });
+
       return this.attachPhotoUrl(savedFinal);
     } catch (error) {
-      this.logger.error(`Error saving maintenance: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error saving maintenance: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
-
 
   // ===================== APPROVE =====================
 
@@ -151,6 +177,20 @@ export class MaintenanceService {
     maintenance.approvedBy = new Types.ObjectId(userId);
     maintenance.approvedAt = new Date();
 
+    // Find driver assigned to vehicle
+    const vehicle = await this.vehicleModel.findById(maintenance.vehicleId);
+
+    if (vehicle?.currentDriverId) {
+      await this.notificationService.sendToDriver({
+        driverId: vehicle.currentDriverId.toString(),
+        title: 'Maintenance Approved',
+        message: 'Your maintenance request has been approved',
+        type: 'MAINTENANCE_APPROVED',
+        meta: {
+          maintenanceId: maintenance._id,
+        },
+      });
+    }
     return maintenance.save();
   }
 
@@ -215,11 +255,15 @@ export class MaintenanceService {
     }
 
     // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
-    const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
+    const vehicle = await this.vehicleModel
+      .findById(maintenance.vehicleId)
+      .exec();
     let newStatus = VehicleStatus.ACTIVATE;
 
     if (vehicle?.currentDriverId) {
-      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      const driver = await this.driverModel
+        .findById(vehicle.currentDriverId)
+        .exec();
       // If driver is still assigned to THIS specific vehicle
       if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
         newStatus = VehicleStatus.ASSIGNED;
@@ -230,6 +274,17 @@ export class MaintenanceService {
       $set: { vehicleStatus: newStatus },
     });
 
+    if (vehicle?.currentDriverId) {
+      await this.notificationService.sendToDriver({
+        driverId: vehicle.currentDriverId.toString(),
+        title: 'Maintenance Rejected',
+        message: 'Your maintenance request has been rejected',
+        type: 'MAINTENANCE_REJECTED',
+        meta: {
+          maintenanceId: maintenance._id,
+        },
+      });
+    }
     return maintenance;
   }
 
@@ -314,11 +369,15 @@ export class MaintenanceService {
     await maintenance.save();
 
     // Revert vehicle status back to ASSIGNED (only if driver is STILL assigned to this vehicle) or ACTIVATE
-    const vehicle = await this.vehicleModel.findById(maintenance.vehicleId).exec();
+    const vehicle = await this.vehicleModel
+      .findById(maintenance.vehicleId)
+      .exec();
     let newStatus = VehicleStatus.ACTIVATE;
 
     if (vehicle?.currentDriverId) {
-      const driver = await this.driverModel.findById(vehicle.currentDriverId).exec();
+      const driver = await this.driverModel
+        .findById(vehicle.currentDriverId)
+        .exec();
       // If driver is still assigned to THIS specific vehicle
       if (driver?.assignedVehicle?.toString() === vehicle._id.toString()) {
         newStatus = VehicleStatus.ASSIGNED;
@@ -326,13 +385,24 @@ export class MaintenanceService {
     }
 
     await this.vehicleModel.findByIdAndUpdate(maintenance.vehicleId, {
-      $set: { 
+      $set: {
         vehicleStatus: newStatus,
         nextServiceDueAtKm: maintenance.nextServiceDueAtKm,
         scheduledServiceDate: maintenance.scheduledServiceDate,
       },
     });
 
+    if (vehicle?.currentDriverId) {
+      await this.notificationService.sendToDriver({
+        driverId: vehicle.currentDriverId.toString(),
+        title: 'Maintenance Completed',
+        message: 'Vehicle maintenance has been completed',
+        type: 'MAINTENANCE_COMPLETED',
+        meta: {
+          maintenanceId: maintenance._id,
+        },
+      });
+    }
     return maintenance;
   }
 
@@ -355,7 +425,8 @@ export class MaintenanceService {
       vehicleId: vehicleOid,
       agencyId: agencyOid,
       maintenanceType: MaintenanceType.GENERAL_INSPECTION,
-      description: 'System-generated seed maintenance to start preventive cycle',
+      description:
+        'System-generated seed maintenance to start preventive cycle',
       odometerAtRequest: currentOdometerKm,
       status: MaintenanceStatus.COMPLETED,
       autoGenerated: true,
@@ -426,7 +497,9 @@ export class MaintenanceService {
     // Create auto-generated SUBMITTED maintenance
     const autoMaintenance = new this.maintenanceModel({
       vehicleId: vehicleOid,
-      agencyId: agencyId ? new Types.ObjectId(agencyId) : latestCompleted.agencyId,
+      agencyId: agencyId
+        ? new Types.ObjectId(agencyId)
+        : latestCompleted.agencyId,
       maintenanceType: MaintenanceType.GENERAL_INSPECTION,
       description: 'Auto-generated preventive maintenance (5000 KM interval)',
       odometerAtRequest: currentKm,
@@ -442,11 +515,25 @@ export class MaintenanceService {
     await this.vehicleModel.findByIdAndUpdate(vehicleOid, {
       $set: { vehicleStatus: VehicleStatus.IN_MAINTENANCE },
     });
+
+    await this.notificationService.notifyAdmins({
+      agencyId: agencyId,
+      title: 'Auto Maintenance Triggered',
+      message: 'Vehicle reached service threshold (5000 KM)',
+      type: 'AUTO_MAINTENANCE_CREATED',
+      meta: {
+        vehicleId,
+      },
+    });
   }
 
   // ===================== GET ALL FOR VEHICLE =====================
 
-  async findByVehicle(vehicleId: string, agencyId?: string, role?: string): Promise<MaintenanceDocument[]> {
+  async findByVehicle(
+    vehicleId: string,
+    agencyId?: string,
+    role?: string,
+  ): Promise<MaintenanceDocument[]> {
     this.validateObjectId(vehicleId, 'vehicleId');
 
     const filter: any = { vehicleId: new Types.ObjectId(vehicleId) };
@@ -512,7 +599,9 @@ export class MaintenanceService {
     return obj;
   }
 
-  private async attachPhotoUrlList(maintenances: MaintenanceDocument[]): Promise<any[]> {
+  private async attachPhotoUrlList(
+    maintenances: MaintenanceDocument[],
+  ): Promise<any[]> {
     return Promise.all(maintenances.map((m) => this.attachPhotoUrl(m)));
   }
 }

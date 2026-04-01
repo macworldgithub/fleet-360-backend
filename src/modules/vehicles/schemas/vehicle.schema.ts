@@ -136,6 +136,9 @@ export class Vehicle {
   @Prop({ type: [String], default: [] })
   vehiclePhotos: string[];
 
+  @Prop({ default: false })
+  serviceAlertSent: boolean;
+  
   @Prop({
     type: [
       {

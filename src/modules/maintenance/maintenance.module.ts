@@ -7,6 +7,8 @@ import { LogbookSession, LogbookSessionSchema } from '../logbooksession-ato-comp
 import { Vehicle, VehicleSchema } from '../vehicles/schemas/vehicle.schema';
 import { Driver, DriverSchema } from '../drivers/schemas/driver.schema';
 import { AwsModule } from '../../aws/aws.module';
+import { NotificationModule } from 'src/notification/notification.module';
+import { MaintenanceCronService } from './maintenance-cron.service';
 
 @Module({
   imports: [
@@ -17,9 +19,10 @@ import { AwsModule } from '../../aws/aws.module';
       { name: Driver.name, schema: DriverSchema },
     ]),
     AwsModule,
+    NotificationModule,
   ],
   controllers: [MaintenanceController],
-  providers: [MaintenanceService],
+  providers: [MaintenanceService, MaintenanceCronService],
   exports: [MaintenanceService],
 })
 export class MaintenanceModule {}
