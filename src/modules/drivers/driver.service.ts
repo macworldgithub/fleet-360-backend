@@ -15,6 +15,7 @@ import { UpdateDriverDto } from './dto/update-driver.dto';
 import { AwsService } from '../../aws/aws.service';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class DriverService {
@@ -24,12 +25,25 @@ export class DriverService {
     @InjectModel(Vehicle.name)
     private vehicleModel: Model<VehicleDocument>,
     private readonly awsService: AwsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Invalid ${label}: ${id}`);
     }
+  }
+
+  private async attachPhotoUrls(driver: DriverDocument): Promise<any> {
+    const obj = driver.toObject();
+    if (obj.profilePicture) {
+      obj['profilePictureUrl'] = await this.awsService.getSignedUrl(
+        obj.profilePicture,
+      );
+    } else {
+      obj['profilePictureUrl'] = null;
+    }
+    return obj;
   }
 
   findByEmail(email: string): Promise<DriverDocument | null> {
@@ -47,7 +61,7 @@ export class DriverService {
     },
     agencyId: string,
     file?: Express.Multer.File,
-  ): Promise<DriverDocument> {
+  ): Promise<any> {
     this.validateObjectId(agencyId, 'agencyId');
 
     const driver = new this.driverModel({
@@ -63,26 +77,33 @@ export class DriverService {
       driver.profilePicture = key;
     }
 
-    return driver.save();
+    const saved = await driver.save();
+    return this.attachPhotoUrls(saved);
   }
 
-  async findAll(agencyId: string, role?: string): Promise<DriverDocument[]> {
+  async findAll(agencyId: string, role?: string): Promise<any[]> {
     const isPrincipal = role === 'PRINCIPAL';
     const filter: any = {};
-    
+
     if (!isPrincipal) {
       this.validateObjectId(agencyId, 'agencyId');
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    return this.driverModel
+    const drivers = await this.driverModel
       .find(filter)
       .populate('assignedVehicle')
       .sort({ createdAt: -1 })
       .exec();
+
+    return Promise.all(drivers.map((d) => this.attachPhotoUrls(d)));
   }
 
-  async findOne(driverId: string, agencyId: string, role?: string): Promise<DriverDocument> {
+  async findOne(
+    driverId: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<any> {
     this.validateObjectId(driverId, 'Driver ID');
 
     const filter: any = { _id: new Types.ObjectId(driverId) };
@@ -99,10 +120,14 @@ export class DriverService {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
     }
 
-    return driver;
+    return this.attachPhotoUrls(driver);
   }
 
-  async getProfilePictureUrl(driverId: string, agencyId: string, role?: string): Promise<string | null> {
+  async getProfilePictureUrl(
+    driverId: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<string | null> {
     const driver = await this.findOne(driverId, agencyId, role);
     if (!driver.profilePicture) return null;
     return this.awsService.getSignedUrl(driver.profilePicture);
@@ -114,7 +139,7 @@ export class DriverService {
     agencyId: string,
     file?: Express.Multer.File,
     role?: string,
-  ): Promise<DriverDocument> {
+  ): Promise<any> {
     this.validateObjectId(driverId, 'Driver ID');
     this.validateObjectId(agencyId, 'agencyId');
 
@@ -123,9 +148,7 @@ export class DriverService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const driver = await this.driverModel
-      .findOne(filter)
-      .exec();
+    const driver = await this.driverModel.findOne(filter).exec();
 
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
@@ -148,16 +171,20 @@ export class DriverService {
 
     if (updateDriverDto.name) driver.name = updateDriverDto.name;
     if (updateDriverDto.email) driver.email = updateDriverDto.email;
-    if (updateDriverDto.phoneNumber) driver.phoneNumber = updateDriverDto.phoneNumber;
-    if (updateDriverDto.driverLicenseNumber) driver.driverLicenseNumber = updateDriverDto.driverLicenseNumber;
+    if (updateDriverDto.phoneNumber)
+      driver.phoneNumber = updateDriverDto.phoneNumber;
+    if (updateDriverDto.driverLicenseNumber)
+      driver.driverLicenseNumber = updateDriverDto.driverLicenseNumber;
 
     const updated = await driver.save();
-    const result = await this.driverModel.findById(updated._id).populate('assignedVehicle').exec();
-    if (!result) throw new NotFoundException('Driver not found after update');
-    return result;
+    return this.attachPhotoUrls(updated);
   }
 
-  async remove(driverId: string, agencyId: string, role?: string): Promise<void> {
+  async remove(
+    driverId: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<void> {
     this.validateObjectId(driverId, 'Driver ID');
 
     const filter: any = { _id: new Types.ObjectId(driverId) };
@@ -180,17 +207,19 @@ export class DriverService {
     }
 
     if (driver.assignedVehicle) {
-      await this.vehicleModel.updateOne(
-        { _id: driver.assignedVehicle },
-        { 
-          $set: { 
-            vehicleStatus: VehicleStatus.ACTIVATE,
-            currentDriverId: null,
-            requestedBy: null,
-            requestedAt: null
-          } 
-        }
-      ).exec();
+      await this.vehicleModel
+        .updateOne(
+          { _id: driver.assignedVehicle },
+          {
+            $set: {
+              vehicleStatus: VehicleStatus.ACTIVATE,
+              currentDriverId: null,
+              requestedBy: null,
+              requestedAt: null,
+            },
+          },
+        )
+        .exec();
     }
 
     await this.driverModel.deleteOne({ _id: driver._id }).exec();
@@ -210,9 +239,7 @@ export class DriverService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -233,9 +260,7 @@ export class DriverService {
       driverFilter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const existingDriver = await this.driverModel
-      .findOne(driverFilter)
-      .exec();
+    const existingDriver = await this.driverModel.findOne(driverFilter).exec();
 
     if (!existingDriver) {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
@@ -248,17 +273,14 @@ export class DriverService {
     }
 
     await this.vehicleModel
-      .findOneAndUpdate(
-        filter,
-        {
-          $set: {
-            vehicleStatus: VehicleStatus.ASSIGNED,
-            currentDriverId: new Types.ObjectId(driverId),
-            requestedBy: null,
-            requestedAt: null,
-          },
+      .findOneAndUpdate(filter, {
+        $set: {
+          vehicleStatus: VehicleStatus.ASSIGNED,
+          currentDriverId: new Types.ObjectId(driverId),
+          requestedBy: null,
+          requestedAt: null,
         },
-      )
+      })
       .exec();
 
     const driver = await this.driverModel
@@ -274,6 +296,22 @@ export class DriverService {
       throw new NotFoundException(`Driver with ID ${driverId} not found`);
     }
 
+    try {
+      await this.notificationService.sendToDriver({
+        driverId: driver._id.toString(),
+        title: 'Vehicle Assigned',
+        message: `You have been assigned ${vehicle.make} ${vehicle.model}`,
+        type: 'VEHICLE_ASSIGNED',
+        meta: {
+          vehicleId: vehicle._id.toString(),
+        },
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        'Failed to send vehicle assignment notification',
+        error,
+      );
+    }
     return driver;
   }
 
@@ -295,17 +333,14 @@ export class DriverService {
     }
 
     await this.vehicleModel
-      .findOneAndUpdate(
-        vehicleFilter,
-        {
-          $set: {
-            vehicleStatus: VehicleStatus.ACTIVATE,
-            currentDriverId: null,
-            requestedBy: null,
-            requestedAt: null,
-          },
+      .findOneAndUpdate(vehicleFilter, {
+        $set: {
+          vehicleStatus: VehicleStatus.ACTIVATE,
+          currentDriverId: null,
+          requestedBy: null,
+          requestedAt: null,
         },
-      )
+      })
       .exec();
 
     const driverFilter: any = {
@@ -330,7 +365,24 @@ export class DriverService {
         `Driver with ID ${driverId} not found or vehicle not assigned`,
       );
     }
-
+    if (driver.deviceTokens?.length) {
+      try {
+        await this.notificationService.sendToDriver({
+          driverId: driver._id.toString(),
+          title: 'Vehicle Unassigned',
+          message: 'Your vehicle has been unassigned',
+          type: 'VEHICLE_UNASSIGNED', // keep consistent with assign API
+          meta: {
+            vehicleId: vehicleId,
+          },
+        });
+      } catch (error) {
+        throw new NotFoundException(
+          'Failed to send vehicle unassignment notification',
+          error,
+        );
+      }
+    }
     return driver;
   }
 
@@ -370,7 +422,23 @@ export class DriverService {
         'Vehicle not available or does not belong to your agency',
       );
     }
-
+    try {
+      await this.notificationService.notifyAdmins({
+        agencyId,
+        title: 'Vehicle Request',
+        message: `Driver requested vehicle`,
+        type: 'VEHICLE_REQUEST', // keep consistent
+        meta: {
+          vehicleId: vehicle._id.toString(),
+          driverId: driverId,
+        },
+      });
+    } catch (error) {
+      throw new NotFoundException(
+        'Failed to send vehicle request notification',
+        error,
+      );
+    }
     return vehicle;
   }
 
@@ -389,9 +457,7 @@ export class DriverService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const current = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const current = await this.vehicleModel.findOne(filter).exec();
 
     if (!current) {
       throw new BadRequestException(
@@ -419,7 +485,29 @@ export class DriverService {
         'Vehicle is not in UNDER_AGREEMENT status or does not exist',
       );
     }
+    if (vehicle.currentDriverId) {
+      const driver = await this.driverModel.findById(vehicle.currentDriverId);
 
+      // Send notification safely
+      if (driver?.deviceTokens?.length) {
+        try {
+          await this.notificationService.sendToDriver({
+            driverId: driver._id.toString(),
+            title: 'Vehicle Approved',
+            message: 'Your vehicle request has been approved',
+            type: 'VEHICLE_APPROVED', //consistent
+            meta: {
+              vehicleId: vehicle._id.toString(),
+            },
+          });
+        } catch (error) {
+          throw new NotFoundException(
+            'Failed to send vehicle approval notification',
+            error,
+          );
+        }
+      }
+    }
     return vehicle;
   }
 
@@ -457,7 +545,38 @@ export class DriverService {
         'Vehicle is not in UNDER_AGREEMENT status or does not exist',
       );
     }
+    if (vehicle.requestedBy) {
+      const driver = await this.driverModel.findById(vehicle.requestedBy);
+
+      if (driver?.deviceTokens?.length) {
+        try {
+          await this.notificationService.sendToDriver({
+            driverId: driver._id.toString(),
+            title: 'Vehicle Request Rejected',
+            message: 'Your vehicle request has been rejected',
+            type: 'VEHICLE_REJECTED', // consistent type
+            meta: {
+              vehicleId: vehicle._id.toString(),
+            },
+          });
+        } catch (error) {
+          throw new NotFoundException(
+            'Failed to send vehicle rejection notification',
+            error,
+          );
+        }
+      }
+    }
 
     return vehicle;
+  }
+  async registerDeviceToken(driverId: string, token: string) {
+    this.validateObjectId(driverId, 'Driver ID');
+
+    await this.driverModel.findByIdAndUpdate(driverId, {
+      $addToSet: { deviceTokens: token },
+    });
+
+    return { message: 'Device token registered successfully' };
   }
 }

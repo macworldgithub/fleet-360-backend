@@ -6,6 +6,7 @@ import { Vehicle, VehicleSchema } from '../vehicles/schemas/vehicle.schema';
 import { Maintenance, MaintenanceSchema } from '../maintenance/schemas/maintenance.schema';
 import { LogbookSession, LogbookSessionSchema } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
 import { Driver, DriverSchema } from '../drivers/schemas/driver.schema';
+import { Agency, AgencySchema } from '../../agencies/schemas/agency.schema';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { Driver, DriverSchema } from '../drivers/schemas/driver.schema';
       { name: Maintenance.name, schema: MaintenanceSchema },
       { name: LogbookSession.name, schema: LogbookSessionSchema },
       { name: Driver.name, schema: DriverSchema },
+      { name: Agency.name, schema: AgencySchema },
     ]),
   ],
   controllers: [DashboardController],

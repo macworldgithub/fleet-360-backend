@@ -5,6 +5,8 @@ import { Vehicle, VehicleSchema } from '../vehicles/schemas/vehicle.schema';
 import { DriverService } from './driver.service';
 import { DriverController } from './driver.controller';
 import { AwsModule } from '../../aws/aws.module';
+import { NotificationModule } from 'src/notification/notification.module';
+import { LicenseCronService } from './license-cron.service';
 
 @Module({
   imports: [
@@ -13,9 +15,10 @@ import { AwsModule } from '../../aws/aws.module';
       { name: Vehicle.name, schema: VehicleSchema },
     ]),
     AwsModule,
+    NotificationModule,
   ],
   controllers: [DriverController],
-  providers: [DriverService],
+  providers: [DriverService, LicenseCronService],
   exports: [DriverService],
 })
 export class DriverModule {}

@@ -61,6 +61,9 @@ export class Vehicle {
   @Prop({ type: Date })
   purchaseDate: Date;
 
+  @Prop({ type: Date })
+  registrationExpiryDate: Date;
+
   @Prop()
   purchaseCost: number;
 
@@ -133,6 +136,9 @@ export class Vehicle {
   @Prop({ type: [String], default: [] })
   vehiclePhotos: string[];
 
+  @Prop({ default: false })
+  serviceAlertSent: boolean;
+  
   @Prop({
     type: [
       {

@@ -11,9 +11,12 @@ import {
   Req,
   Query,
   BadRequestException,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -24,6 +27,7 @@ import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceDto } from './dtos/create-maintenance.dto';
 import { UpdateMaintenanceStatusDto } from './dtos/update-maintenance-status.dto';
 import { MaintenanceStatus } from './schemas/maintenance.schema';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Maintenance')
 @ApiBearerAuth()
@@ -52,11 +56,17 @@ export class MaintenanceController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new maintenance request' })
-  create(@Req() req, @Body() dto: CreateMaintenanceDto) {
+  @UseInterceptors(FilesInterceptor('photos', 5))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Create a new maintenance request with optional photos (Max 5)' })
+  create(
+    @Req() req,
+    @Body() dto: CreateMaintenanceDto,
+    @UploadedFiles() photos?: Express.Multer.File[],
+  ) {
     const agencyId = req.user.agencyId;
     const userId = req.user.userId || req.user._id || agencyId;
-    return this.maintenanceService.create(dto, userId, agencyId);
+    return this.maintenanceService.create(dto, userId, agencyId, photos);
   }
 
   @Patch(':id/status')

@@ -19,6 +19,8 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
+      // <-- enable implicit conversion so strings like "2024" become numbers for @IsNumber()
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 
@@ -35,10 +37,7 @@ async function bootstrap() {
 
   // Stripe webhook raw body parser
   // This must come before any JSON body parsing for this route
-  app.use(
-    '/stripe/webhook',
-    bodyParser.raw({ type: 'application/json' }),
-  );
+  app.use('/stripe/webhook', bodyParser.raw({ type: 'application/json' }));
 
   // Start the server
   await app.listen(process.env.PORT || 5000);

@@ -17,6 +17,8 @@ import { FuelModule } from './modules/fuel/fuel.module';
 import { CostIntelligenceModule } from './modules/cost-intelligence/cost-intelligence.module';
 import { BillingModule } from './modules/billings/billing.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { NotificationModule } from './notification/notification.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -45,7 +47,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     CostIntelligenceModule,
     AwsModule,
     BillingModule,
-    DashboardModule
+    DashboardModule,
+    NotificationModule,
+    ScheduleModule.forRoot(), 
   ],
 })
 export class AppModule {}

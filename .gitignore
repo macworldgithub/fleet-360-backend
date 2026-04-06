@@ -2,7 +2,8 @@
 /dist
 /node_modules
 /build
-
+src/Config/Firebase/
+src/google-services.json
 # Logs
 logs
 *.log

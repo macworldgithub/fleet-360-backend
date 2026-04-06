@@ -22,6 +22,10 @@ export class UpdateDriverDto {
   @IsOptional()
   driverLicenseNumber?: string;
 
+  @ApiPropertyOptional({ example: '11-1-2022' })
+  @IsOptional()
+  licenseExpiryDate?: Date;
+
   @ApiPropertyOptional({ type: 'string', format: 'binary' })
   @IsOptional()
   profilePicture?: any;

@@ -20,11 +20,17 @@ export class Driver {
   @Prop({ required: true, unique: true, trim: true })
   driverLicenseNumber: string;
 
+  @Prop()
+  licenseExpiryDate: Date;
+
   @Prop({ type: Types.ObjectId, ref: 'Vehicle', default: null })
   assignedVehicle: Types.ObjectId | null;
 
   @Prop({ type: String, default: null })
   profilePicture: string | null;
+
+  @Prop({ type: [String], default: [] })
+  deviceTokens: string[];
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
