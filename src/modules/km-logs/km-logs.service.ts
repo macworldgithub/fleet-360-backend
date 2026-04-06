@@ -21,6 +21,8 @@ import { MaintenanceService } from '../maintenance/maintenance.service';
 import { AwsService } from 'src/aws/aws.service';
 import { v4 as uuid } from 'uuid';
 import * as path from 'path';
+import { NotificationService } from 'src/notification/notification.service';
+import { KmLogAnalyticsService } from './km-log-analytics.service';
 
 @Injectable()
 export class KmLogsService {
@@ -33,6 +35,8 @@ export class KmLogsService {
     private vehicleModel: Model<VehicleDocument>,
     private readonly maintenanceService: MaintenanceService,
     private readonly awsService: AwsService,
+    private readonly notificationService: NotificationService,
+    private readonly kmLogAnalyticsService: KmLogAnalyticsService,
   ) {}
 
   private validateObjectId(id: string, label: string) {
@@ -100,8 +104,19 @@ export class KmLogsService {
       throw new NotFoundException('Vehicle not found in your agency');
     }
 
-    if (vehicle.vehicleStatus === VehicleStatus.DEACTIVATE || 
-        vehicle.vehicleStatus === VehicleStatus.IN_MAINTENANCE) {
+    if (dto.startOdometerInKms < vehicle.odometerInKms) {
+      await this.notificationService.send({
+        type: 'ODOMETER_ANOMALY',
+        message: `Start odometer (${dto.startOdometerInKms}) is less than current vehicle odometer (${vehicle.odometerInKms})`,
+        vehicleId: dto.vehicleId,
+        agencyId,
+      });
+    }
+
+    if (
+      vehicle.vehicleStatus === VehicleStatus.DEACTIVATE ||
+      vehicle.vehicleStatus === VehicleStatus.IN_MAINTENANCE
+    ) {
       throw new BadRequestException(
         `Cannot create KM Log for vehicle in ${vehicle.vehicleStatus} status`,
       );
@@ -111,6 +126,21 @@ export class KmLogsService {
       dto.startOdometerInKms,
       dto.endOdometerInKms,
     );
+
+    await this.kmLogAnalyticsService.checkSuspiciousDistance(
+      dto.vehicleId,
+      agencyId,
+      distanceInKms,
+    );
+
+    if (distanceInKms > 1000) {
+      await this.notificationService.send({
+        type: 'SUSPICIOUS_DISTANCE',
+        message: `Unusually large trip recorded: ${distanceInKms} km`,
+        vehicleId: dto.vehicleId,
+        agencyId,
+      });
+    }
 
     // ── Find the OLDEST active logbook session for this vehicle ──
     const vehicleOid = new Types.ObjectId(dto.vehicleId);
@@ -131,6 +161,15 @@ export class KmLogsService {
       businessPurpose: dto.businessPurpose ?? null,
       logbookSessionId: activeSession ? activeSession._id : null,
     };
+
+    if (dto.tripType === TripType.BUSINESS && !dto.businessPurpose) {
+      await this.notificationService.send({
+        type: 'MISSING_BUSINESS_PURPOSE',
+        message: 'Business trip logged without purpose',
+        vehicleId: dto.vehicleId,
+        agencyId,
+      });
+    }
 
     // ── 3. Upload odometer photos to S3 ──
     const startPhotoKey = await this.awsService.uploadFile(
@@ -202,6 +241,23 @@ export class KmLogsService {
       dto.endOdometerInKms,
     );
 
+    if (
+      vehicle.nextServiceDueAtKm &&
+      dto.endOdometerInKms >= vehicle.nextServiceDueAtKm
+    ) {
+      await this.notificationService.send({
+        type: 'SERVICE_DUE',
+        message: `Vehicle reached service threshold (${vehicle.nextServiceDueAtKm} km)`,
+        vehicleId: dto.vehicleId,
+        agencyId,
+      });
+    }
+
+    await this.kmLogAnalyticsService.checkMaintenanceThreshold(
+      dto.vehicleId,
+      agencyId,
+      dto.endOdometerInKms,
+    );
     return log;
   }
 
@@ -241,7 +297,10 @@ export class KmLogsService {
       if (filters.toDate) query.tripDate.$lte = new Date(filters.toDate);
     }
 
-    const logs = await this.kmLogModel.find(query).sort({ tripDate: -1 }).exec();
+    const logs = await this.kmLogModel
+      .find(query)
+      .sort({ tripDate: -1 })
+      .exec();
     return Promise.all(logs.map((log) => this.getLogWithSignedUrls(log)));
   }
 
@@ -276,7 +335,7 @@ export class KmLogsService {
     }
 
     const existing = await this.kmLogModel.findOne(filter).exec();
-    
+
     if (!existing) {
       throw new NotFoundException('KM Log not found');
     }
@@ -336,10 +395,11 @@ export class KmLogsService {
       if (role !== 'PRINCIPAL') {
         vehicleFilter.agencyId = new Types.ObjectId(agencyId);
       }
-      await this.vehicleModel.updateOne(
-        vehicleFilter,
-        { $set: { odometerInKms: updated.endOdometerInKms } }
-      ).exec();
+      await this.vehicleModel
+        .updateOne(vehicleFilter, {
+          $set: { odometerInKms: updated.endOdometerInKms },
+        })
+        .exec();
     }
 
     if (!updated) {
@@ -365,23 +425,38 @@ export class KmLogsService {
 
     // ── 0. Delete photos from S3 ──
     if (deleted.startOdometerPhoto) {
-      await this.awsService.deleteFile(deleted.startOdometerPhoto).catch(e => console.error('Error deleting start photo from S3', e));
+      await this.awsService
+        .deleteFile(deleted.startOdometerPhoto)
+        .catch((e) => console.error('Error deleting start photo from S3', e));
     }
     if (deleted.endOdometerPhoto) {
-      await this.awsService.deleteFile(deleted.endOdometerPhoto).catch(e => console.error('Error deleting end photo from S3', e));
+      await this.awsService
+        .deleteFile(deleted.endOdometerPhoto)
+        .catch((e) => console.error('Error deleting end photo from S3', e));
     }
 
     // ── 1. Revert Logbook Session Totals ──
     if (deleted.logbookSessionId) {
-      const session = await this.sessionModel.findById(deleted.logbookSessionId).exec();
+      const session = await this.sessionModel
+        .findById(deleted.logbookSessionId)
+        .exec();
       if (session && !session.isLocked) {
         // Subtract deleted distance
-        session.totalKms = Math.max(0, session.totalKms - deleted.distanceInKms);
-        
+        session.totalKms = Math.max(
+          0,
+          session.totalKms - deleted.distanceInKms,
+        );
+
         if (deleted.tripType === TripType.BUSINESS) {
-          session.businessKms = Math.max(0, session.businessKms - deleted.distanceInKms);
+          session.businessKms = Math.max(
+            0,
+            session.businessKms - deleted.distanceInKms,
+          );
         } else {
-          session.privateKms = Math.max(0, session.privateKms - deleted.distanceInKms);
+          session.privateKms = Math.max(
+            0,
+            session.privateKms - deleted.distanceInKms,
+          );
         }
 
         // Find the LATEST trip remaining in this specific session
@@ -403,7 +478,7 @@ export class KmLogsService {
         // Recalculate percentage
         if (session.totalKms > 0) {
           session.businessUsePercentage = Number(
-            ((session.businessKms / session.totalKms) * 100).toFixed(2)
+            ((session.businessKms / session.totalKms) * 100).toFixed(2),
           );
         } else {
           session.businessUsePercentage = 0;
@@ -426,10 +501,12 @@ export class KmLogsService {
 
     if (latestRemainingTrip) {
       // Roll back vehicle odometer to the latest remaining trip's end reading
-      await this.vehicleModel.updateOne(
-        { _id: deleted.vehicleId },
-        { $set: { odometerInKms: latestRemainingTrip.endOdometerInKms } }
-      ).exec();
+      await this.vehicleModel
+        .updateOne(
+          { _id: deleted.vehicleId },
+          { $set: { odometerInKms: latestRemainingTrip.endOdometerInKms } },
+        )
+        .exec();
     } else {
       // If NO trips left, we might want to keep it as is or find a different reference.
       // For now, we leave it since we don't know the "baseline" without looking at original vehicle create odometer.

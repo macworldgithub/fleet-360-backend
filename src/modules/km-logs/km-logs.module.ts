@@ -13,6 +13,9 @@ import {
 } from '../logbooksession-ato-compliance/schemas/logbook-session.schema';
 import { MaintenanceModule } from '../maintenance/maintenance.module';
 import { AwsModule } from 'src/aws/aws.module';
+import { NotificationModule } from 'src/notification/notification.module';
+import { KmLogReminderService } from './km-logs-cron.service';
+import { KmLogAnalyticsService } from './km-log-analytics.service';
 
 @Module({
   imports: [
@@ -23,9 +26,10 @@ import { AwsModule } from 'src/aws/aws.module';
     ]),
     MaintenanceModule,
     AwsModule,
+    NotificationModule, 
   ],
   controllers: [KmLogsController],
-  providers: [KmLogsService],
+  providers: [KmLogsService, KmLogReminderService, KmLogAnalyticsService],
   exports: [KmLogsService],
 })
 export class KmLogsModule {}
