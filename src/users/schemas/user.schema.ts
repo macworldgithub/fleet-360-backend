@@ -14,34 +14,36 @@ export class User {
   @Prop({ required: true })
   passwordHash: string;
 
-  // Role
-  @Prop({
-    required: true,
-    enum: ['PASSENGER', 'DRIVER'],
-    default: 'DRIVER',
-  })
-  role: string;
-
   @Prop({ default: false })
   isEmailVerified: boolean;
 
-  // Refresh token
   @Prop({ type: String, default: null })
   refreshTokenHash: string | null;
 
-  // Email verification
-  @Prop({ type: String, default: null })
-  emailVerificationTokenHash: string | null;
-
-  @Prop({ type: Date, default: null })
-  emailVerificationExpiresAt: Date | null;
-
-  // Reset password
   @Prop({ type: String, default: null })
   resetPasswordTokenHash: string | null;
 
   @Prop({ type: Date, default: null })
   resetPasswordExpiresAt: Date | null;
+
+  @Prop({ type: String, default: null })
+  emailOtp: string | null;
+
+  @Prop({ type: Date, default: null })
+  emailOtpExpiresAt: Date | null;
+
+  // New fields
+  @Prop({ type: String, default: null })
+  phoneNumber: string | null;
+
+  @Prop({ type: String, default: null })
+  driverLicenseNumber: string | null;
+
+  @Prop({ type: String, default: null })
+  agencyName: string | null;
+
+  @Prop({ type: String, default: null })
+  profilePicture: string | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
