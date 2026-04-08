@@ -25,6 +25,6 @@ import { NotificationModule } from 'src/notification/notification.module';
   ],
   controllers: [VehicleController],
   providers: [VehicleService, VehicleAlertsService],
-  exports: [VehicleService],
+  exports: [MongooseModule, VehicleService],
 })
 export class VehicleModule {}
