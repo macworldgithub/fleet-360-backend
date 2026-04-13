@@ -6,14 +6,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  Incident,
-  IncidentDocument,
-} from './schemas/incident.schema';
+import { Incident, IncidentDocument } from './schemas/incident.schema';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 import { UpdateIncidentDto } from './dto/update-incident.dto';
 import { AwsService } from '../../aws/aws.service';
 import { extname } from 'path';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class IncidentService {
@@ -21,6 +19,7 @@ export class IncidentService {
     @InjectModel(Incident.name)
     private incidentModel: Model<IncidentDocument>,
     private readonly awsService: AwsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(
@@ -50,6 +49,58 @@ export class IncidentService {
       isDeleted: false,
     });
 
+    await this.notificationService.send({
+      type: 'INCIDENT_REPORTED',
+      title: 'Incident Reported',
+      message: `${dto.incidentType} reported at ${dto.location}`,
+      vehicleId,
+      agencyId,
+    });
+
+    if (dto.damageSeverity === 'HIGH') {
+      await this.notificationService.send({
+        type: 'HIGH_DAMAGE',
+        title: 'High Damage Alert',
+        message: `High severity damage reported`,
+        vehicleId,
+        agencyId,
+      });
+    }
+
+    const HIGH_COST_THRESHOLD = 5000;
+
+    if (
+      dto.estimatedRepairCost &&
+      dto.estimatedRepairCost > HIGH_COST_THRESHOLD
+    ) {
+      await this.notificationService.send({
+        type: 'HIGH_REPAIR_COST',
+        title: 'High Repair Cost',
+        message: `Estimated repair cost: ${dto.estimatedRepairCost}`,
+        vehicleId,
+        agencyId,
+      });
+    }
+
+    if (dto.policeReportNumber) {
+      await this.notificationService.send({
+        type: 'POLICE_REPORT',
+        title: 'Police Report Filed',
+        message: `Police report number: ${dto.policeReportNumber}`,
+        vehicleId,
+        agencyId,
+      });
+    }
+
+    if (dto.insuranceClaimFiled) {
+      await this.notificationService.send({
+        type: 'INSURANCE_CLAIM',
+        title: 'Insurance Claim Filed',
+        message: `Insurance claim has been filed`,
+        vehicleId,
+        agencyId,
+      });
+    }
     // Upload photos to S3 if provided
     if (evidencePhotos && evidencePhotos.length > 0) {
       const uploadedKeys: string[] = [];
@@ -82,7 +133,7 @@ export class IncidentService {
 
   async findAll(agencyId: string, vehicleId?: string, role?: string) {
     const isPrincipal = role === 'PRINCIPAL';
-    const query: any = { 
+    const query: any = {
       isDeleted: false,
     };
 
@@ -92,8 +143,13 @@ export class IncidentService {
 
     if (vehicleId) query.vehicleId = new Types.ObjectId(vehicleId);
 
-    const incidents = await this.incidentModel.find(query).sort({ createdAt: -1 }).exec();
-    return Promise.all(incidents.map(incident => this.attachPhotoUrls(incident)));
+    const incidents = await this.incidentModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .exec();
+    return Promise.all(
+      incidents.map((incident) => this.attachPhotoUrls(incident)),
+    );
   }
 
   async getOne(id: string, agencyId: string, role?: string) {
@@ -102,7 +158,8 @@ export class IncidentService {
   }
 
   async findOne(id: string, agencyId: string, role?: string) {
-    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+    if (!Types.ObjectId.isValid(id))
+      throw new BadRequestException('Invalid Incident ID');
 
     const filter: any = { _id: new Types.ObjectId(id) };
     if (role !== 'PRINCIPAL') {
@@ -118,7 +175,11 @@ export class IncidentService {
   /**
    * Get signed URLs for all evidence photos of an incident.
    */
-  async getPhotos(id: string, agencyId: string, role?: string): Promise<{ key: string; url: string }[]> {
+  async getPhotos(
+    id: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<{ key: string; url: string }[]> {
     const incident = await this.findOne(id, agencyId, role);
 
     if (!incident.evidencePhotos || incident.evidencePhotos.length === 0) {
@@ -167,7 +228,12 @@ export class IncidentService {
   /**
    * Delete a specific photo from an incident.
    */
-  async deletePhoto(id: string, agencyId: string, photoKey: string, role?: string): Promise<any> {
+  async deletePhoto(
+    id: string,
+    agencyId: string,
+    photoKey: string,
+    role?: string,
+  ): Promise<any> {
     const incident = await this.findOne(id, agencyId, role);
 
     if (!incident.evidencePhotos?.includes(photoKey)) {
@@ -186,37 +252,53 @@ export class IncidentService {
     return this.attachPhotoUrls(incident);
   }
 
-  async update(id: string, dto: UpdateIncidentDto, agencyId: string, role?: string) {
-    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+  async update(
+    id: string,
+    dto: UpdateIncidentDto,
+    agencyId: string,
+    role?: string,
+  ) {
+    if (!Types.ObjectId.isValid(id))
+      throw new BadRequestException('Invalid Incident ID');
 
     const filter: any = { _id: new Types.ObjectId(id) };
     if (role !== 'PRINCIPAL') {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const incident = await this.incidentModel.findOneAndUpdate(
-      filter,
-      dto,
-      { new: true },
-    ).exec();
+    const existing = await this.incidentModel.findOne(filter).exec();
+    if (!existing) throw new NotFoundException('Incident not found');
+
+    const incident = await this.incidentModel
+      .findOneAndUpdate(filter, dto, { new: true })
+      .exec();
+
+    if (dto.status && dto.status !== existing.status) {
+      await this.notificationService.send({
+        type: 'INCIDENT_STATUS_UPDATED',
+        title: 'Incident Status Updated',
+        message: `Status changed to ${dto.status}`,
+        vehicleId: incident?.vehicleId.toString(),
+        agencyId: incident?.agencyId.toString(),
+      });
+    }
 
     if (!incident) throw new NotFoundException('Incident not found');
     return this.attachPhotoUrls(incident);
   }
 
   async remove(id: string, agencyId: string, role?: string) {
-    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid Incident ID');
+    if (!Types.ObjectId.isValid(id))
+      throw new BadRequestException('Invalid Incident ID');
 
     const filter: any = { _id: new Types.ObjectId(id) };
     if (role !== 'PRINCIPAL') {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const incident = await this.incidentModel.findOneAndUpdate(
-      filter,
-      { isDeleted: true },
-      { new: true },
-    ).exec();
+    const incident = await this.incidentModel
+      .findOneAndUpdate(filter, { isDeleted: true }, { new: true })
+      .exec();
 
     if (!incident) throw new NotFoundException('Incident not found');
     return this.attachPhotoUrls(incident);
