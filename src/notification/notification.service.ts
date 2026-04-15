@@ -9,6 +9,10 @@ import {
   DriverDocument,
 } from 'src/modules/drivers/schemas/driver.schema';
 import { Notification, NotificationDocument } from './notification.schema';
+import {
+  Vehicle,
+  VehicleDocument,
+} from 'src/modules/vehicles/schemas/vehicle.schema';
 
 @Injectable()
 export class NotificationService {
@@ -21,6 +25,8 @@ export class NotificationService {
 
     private readonly firebaseService: FirebaseService,
     private readonly gateway: NotificationsGateway,
+    @InjectModel(Vehicle.name)
+    private vehicleModel: Model<VehicleDocument>,
   ) {}
 
   // CREATE NOTIFICATION RECORD
@@ -73,6 +79,69 @@ export class NotificationService {
     }
   }
 
+  async send({
+    type,
+    message,
+    vehicleId,
+    agencyId,
+    driverId,
+    title,
+    meta,
+  }: {
+    type: string;
+    message: string;
+    vehicleId?: string;
+    agencyId?: string;
+    driverId?: string;
+    title?: string;
+    meta?: any;
+  }) {
+    const finalTitle = title || type.replace(/_/g, ' ');
+    const payloadMeta = { vehicleId, ...meta };
+
+    console.log(finalTitle, '34343');
+
+    let resolvedDriverId = driverId;
+
+    // ✅ AUTO-FETCH DRIVER FROM VEHICLE
+    if (!resolvedDriverId && vehicleId) {
+      const vehicle = await this.vehicleModel.findById(vehicleId);
+      resolvedDriverId = vehicle?.currentDriverId?.toString();
+    }
+
+    // ✅ ALWAYS send to driver if exists
+    if (resolvedDriverId) {
+      await this.sendToDriver({
+        driverId: resolvedDriverId,
+        title: finalTitle,
+        message,
+        type,
+        meta: payloadMeta,
+      });
+    }
+
+    // ✅ ALSO notify admins (optional but recommended)
+    if (agencyId) {
+      await this.notifyAdmins({
+        agencyId,
+        title: finalTitle,
+        message,
+        type,
+        meta: payloadMeta,
+      });
+    }
+
+    // ✅ Always save fallback
+    return this.createNotification({
+      title: finalTitle,
+      message,
+      agencyId,
+      type,
+      meta: payloadMeta,
+      target: resolvedDriverId ? 'DRIVER' : 'ADMIN',
+    });
+  }
+
   // 🌐 SEND TO ADMIN (WEBSOCKET)
   async notifyAdmins({
     agencyId,
@@ -94,7 +163,7 @@ export class NotificationService {
       agencyId,
       type,
       meta,
-      target: 'ADMIN'
+      target: 'ADMIN',
     });
 
     // 2. Emit via WebSocket

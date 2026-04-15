@@ -8,6 +8,8 @@ import { MaintenanceModule } from '../maintenance/maintenance.module';
 import { AgenciesModule } from '../../agencies/agencies.module';
 import { LogbookSessionAtoComplianceModule } from '../logbooksession-ato-compliance/logbook-session-ato-compliance.module';
 import { AwsModule } from '../../aws/aws.module';
+import { VehicleAlertsService } from './vehicle-alerts.service';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -19,9 +21,10 @@ import { AwsModule } from '../../aws/aws.module';
     AgenciesModule,
     LogbookSessionAtoComplianceModule,
     AwsModule,
+    NotificationModule,
   ],
   controllers: [VehicleController],
-  providers: [VehicleService],
-  exports: [VehicleService],
+  providers: [VehicleService, VehicleAlertsService],
+  exports: [MongooseModule, VehicleService],
 })
 export class VehicleModule {}

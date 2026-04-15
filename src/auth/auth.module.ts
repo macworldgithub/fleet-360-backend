@@ -7,6 +7,7 @@ import { AgenciesModule } from '../agencies/agencies.module';
 import { AwsModule } from '../aws/aws.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { MailModule } from 'src/common/mail/mail.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     DriverModule,
     AgenciesModule,
     AwsModule,
+    MailModule,
     JwtModule.register({}), // config handled manually in service
   ],
   controllers: [AuthController],

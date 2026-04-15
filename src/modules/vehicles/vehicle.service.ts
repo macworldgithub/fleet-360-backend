@@ -16,7 +16,10 @@ import {
 } from './schemas/vehicle.schema';
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto, UpdateVehiclePhotosDto } from './dto/update-vehicle.dto';
+import {
+  UpdateVehicleDto,
+  UpdateVehiclePhotosDto,
+} from './dto/update-vehicle.dto';
 import { RemoveVehiclePhotosDto } from './dto/remove-vehicle-photos.dto';
 import { MaintenanceService } from '../maintenance/maintenance.service';
 import { AgenciesService } from '../../agencies/agencies.service';
@@ -25,6 +28,7 @@ import { LogbookSessionAtoComplianceService } from '../logbooksession-ato-compli
 import { AwsService } from '../../aws/aws.service';
 import { v4 as uuid } from 'uuid';
 import * as path from 'path';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class VehicleService {
@@ -38,6 +42,7 @@ export class VehicleService {
     private readonly agenciesService: AgenciesService,
     private readonly logbookSessionService: LogbookSessionAtoComplianceService,
     private readonly awsService: AwsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private validateObjectId(id: string, label = 'ID'): void {
@@ -53,9 +58,7 @@ export class VehicleService {
   private calculateFbtYear(date: Date): string {
     const month = date.getMonth(); // 0-indexed
     const year = date.getFullYear();
-    return month >= 3
-      ? `${year}-${year + 1}`
-      : `${year - 1}-${year}`;
+    return month >= 3 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   }
 
   async create(
@@ -87,9 +90,13 @@ export class VehicleService {
     }
 
     // Check for duplicate VIN to avoid 500 error
-    const existingVehicle = await this.vehicleModel.findOne({ vin: createVehicleDto.vin }).exec();
+    const existingVehicle = await this.vehicleModel
+      .findOne({ vin: createVehicleDto.vin })
+      .exec();
     if (existingVehicle) {
-      throw new ConflictException(`Vehicle with VIN ${createVehicleDto.vin} already exists`);
+      throw new ConflictException(
+        `Vehicle with VIN ${createVehicleDto.vin} already exists`,
+      );
     }
 
     if (userId) {
@@ -105,7 +112,11 @@ export class VehicleService {
     // ── Update photos logic ──
     const displayExt = path.extname(displayPhoto.originalname).toLowerCase();
     const displayKey = `${agencyId}/vehicles/${vehicle._id}/display-${uuid()}${displayExt}`;
-    await this.awsService.uploadFile(displayPhoto.buffer, displayKey, displayPhoto.mimetype);
+    await this.awsService.uploadFile(
+      displayPhoto.buffer,
+      displayKey,
+      displayPhoto.mimetype,
+    );
     vehicle.displayPhoto = displayKey;
 
     if (vehiclePhotos && vehiclePhotos.length > 0) {
@@ -149,10 +160,12 @@ export class VehicleService {
 
   private async attachPhotoUrls(vehicle: VehicleDocument): Promise<any> {
     const obj = vehicle.toObject();
-    
+
     // Display Photo
     if (obj.displayPhoto) {
-      obj['displayPhotoUrl'] = await this.awsService.getSignedUrl(obj.displayPhoto);
+      obj['displayPhotoUrl'] = await this.awsService.getSignedUrl(
+        obj.displayPhoto,
+      );
     } else {
       obj['displayPhotoUrl'] = null;
     }
@@ -160,7 +173,7 @@ export class VehicleService {
     // Gallery Photos
     if (obj.vehiclePhotos && obj.vehiclePhotos.length > 0) {
       obj['vehiclePhotoUrls'] = await Promise.all(
-        obj.vehiclePhotos.map(key => this.awsService.getSignedUrl(key))
+        obj.vehiclePhotos.map((key) => this.awsService.getSignedUrl(key)),
       );
     } else {
       obj['vehiclePhotoUrls'] = [];
@@ -176,7 +189,7 @@ export class VehicleService {
   ): Promise<VehicleDocument[]> {
     const isPrincipal = role === 'PRINCIPAL';
     const filter: any = {};
-    
+
     if (!isPrincipal) {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
@@ -186,11 +199,18 @@ export class VehicleService {
       filter.officeId = new Types.ObjectId(officeId);
     }
 
-    const vehicles = await this.vehicleModel.find(filter).sort({ createdAt: -1 }).exec();
-    return Promise.all(vehicles.map(v => this.attachPhotoUrls(v)));
+    const vehicles = await this.vehicleModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .exec();
+    return Promise.all(vehicles.map((v) => this.attachPhotoUrls(v)));
   }
 
-  async findOne(vehicleId: string, agencyId: string, role?: string): Promise<any> {
+  async findOne(
+    vehicleId: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<any> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const filter: any = { _id: new Types.ObjectId(vehicleId) };
@@ -198,9 +218,7 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -238,22 +256,39 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
+    const oldVehicle = await this.vehicleModel.findById(vehicleId);
+
     const vehicle = await this.vehicleModel
-      .findOneAndUpdate(
-        filter,
-        { $set: updateData },
-        { new: true },
-      )
+      .findOneAndUpdate(filter, { $set: updateData }, { new: true })
       .exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
+    if (
+      updateVehicleDto.currentDriverId &&
+      updateVehicleDto.currentDriverId !==
+        oldVehicle?.currentDriverId?.toString()
+    ) {
+      await this.notificationService.send({
+        type: 'VEHICLE_ASSIGNED',
+        title: 'Vehicle Assigned',
+        message: `You have been assigned vehicle ${vehicle.registrationNumber}`,
+        vehicleId: vehicle._id.toString(),
+        agencyId: vehicle.agencyId.toString(),
+        driverId: updateVehicleDto.currentDriverId,
+      });
+    }
+
     return this.attachPhotoUrls(vehicle);
   }
 
-  async remove(vehicleId: string, agencyId: string, role?: string): Promise<VehicleDocument> {
+  async remove(
+    vehicleId: string,
+    agencyId: string,
+    role?: string,
+  ): Promise<VehicleDocument> {
     this.validateObjectId(vehicleId, 'Vehicle ID');
 
     const filter: any = { _id: new Types.ObjectId(vehicleId) };
@@ -262,34 +297,40 @@ export class VehicleService {
     }
 
     // 1. Find the vehicle
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
     }
 
     // 2. Cleanup Drivers if assigned
-    await this.driverModel.updateMany(
-      { assignedVehicle: vehicle._id },
-      { $set: { assignedVehicle: null } }
-    ).exec();
+    await this.driverModel
+      .updateMany(
+        { assignedVehicle: vehicle._id },
+        { $set: { assignedVehicle: null } },
+      )
+      .exec();
 
     // 3. Delete Vehicle
     await this.vehicleModel.deleteOne({ _id: vehicle._id }).exec();
 
     // 4. Cleanup photos from S3
     if (vehicle.displayPhoto) {
-      this.awsService.deleteFile(vehicle.displayPhoto).catch((e) =>
-        console.error(`Failed to delete displayPhoto from S3: ${e.message}`),
-      );
+      this.awsService
+        .deleteFile(vehicle.displayPhoto)
+        .catch((e) =>
+          console.error(`Failed to delete displayPhoto from S3: ${e.message}`),
+        );
     }
     if (vehicle.vehiclePhotos && vehicle.vehiclePhotos.length > 0) {
       vehicle.vehiclePhotos.forEach((photo) => {
-        this.awsService.deleteFile(photo).catch((e) =>
-          console.error(`Failed to delete gallery photo from S3: ${e.message}`),
-        );
+        this.awsService
+          .deleteFile(photo)
+          .catch((e) =>
+            console.error(
+              `Failed to delete gallery photo from S3: ${e.message}`,
+            ),
+          );
       });
     }
 
@@ -308,9 +349,7 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -344,9 +383,7 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -359,9 +396,7 @@ export class VehicleService {
     }
 
     if (!vehicle.loanAmount && vehicle.loanAmount !== 0) {
-      throw new BadRequestException(
-        'Vehicle does not have a loanAmount set',
-      );
+      throw new BadRequestException('Vehicle does not have a loanAmount set');
     }
 
     if (amount > vehicle.loanAmount) {
@@ -371,7 +406,15 @@ export class VehicleService {
     }
 
     const newBalance = vehicle.loanAmount - amount;
-
+    if (newBalance === 0) {
+      await this.notificationService.send({
+        type: 'LOAN_CLOSED',
+        title: 'Loan Completed',
+        message: `Loan fully paid for vehicle ${vehicle.registrationNumber}`,
+        vehicleId: vehicle._id.toString(),
+        agencyId: vehicle.agencyId.toString(),
+      });
+    }
     // Record the history
     vehicle.loanRepaymentHistory.push({
       amount,
@@ -406,9 +449,7 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -421,14 +462,22 @@ export class VehicleService {
     if (displayPhoto) {
       // 1. Delete old display photo if it exists
       if (vehicle.displayPhoto) {
-        this.awsService.deleteFile(vehicle.displayPhoto).catch((e) =>
-          console.error(`Failed to delete old displayPhoto from S3: ${e.message}`),
-        );
+        this.awsService
+          .deleteFile(vehicle.displayPhoto)
+          .catch((e) =>
+            console.error(
+              `Failed to delete old displayPhoto from S3: ${e.message}`,
+            ),
+          );
       }
       // 2. Upload new display photo
       const ext = path.extname(displayPhoto.originalname).toLowerCase();
       const key = `${agencyId}/vehicles/${vehicle._id}/display-${uuid()}${ext}`;
-      await this.awsService.uploadFile(displayPhoto.buffer, key, displayPhoto.mimetype);
+      await this.awsService.uploadFile(
+        displayPhoto.buffer,
+        key,
+        displayPhoto.mimetype,
+      );
       setQuery.displayPhoto = key;
     }
 
@@ -456,15 +505,13 @@ export class VehicleService {
     }
 
     const updated = await this.vehicleModel
-      .findOneAndUpdate(
-        filter,
-        updateQuery,
-        { new: true },
-      )
+      .findOneAndUpdate(filter, updateQuery, { new: true })
       .exec();
 
     if (!updated) {
-      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found after update`);
+      throw new NotFoundException(
+        `Vehicle with ID ${vehicleId} not found after update`,
+      );
     }
 
     return this.attachPhotoUrls(updated);
@@ -483,9 +530,7 @@ export class VehicleService {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
 
-    const vehicle = await this.vehicleModel
-      .findOne(filter)
-      .exec();
+    const vehicle = await this.vehicleModel.findOne(filter).exec();
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with ID ${vehicleId} not found`);
@@ -507,22 +552,24 @@ export class VehicleService {
     }
 
     const updatedVehicle = await this.vehicleModel
-      .findOneAndUpdate(
-        filter,
-        updateQuery,
-        { new: true },
-      )
+      .findOneAndUpdate(filter, updateQuery, { new: true })
       .exec();
 
     if (!updatedVehicle) {
-      throw new NotFoundException(`Vehicle with ID ${vehicleId} not found after update`);
+      throw new NotFoundException(
+        `Vehicle with ID ${vehicleId} not found after update`,
+      );
     }
 
     if (photosToDelete.length > 0) {
       photosToDelete.forEach((photo) => {
-        this.awsService.deleteFile(photo).catch((e) =>
-          console.error(`Failed to delete gallery photo from S3: ${e.message}`),
-        );
+        this.awsService
+          .deleteFile(photo)
+          .catch((e) =>
+            console.error(
+              `Failed to delete gallery photo from S3: ${e.message}`,
+            ),
+          );
       });
     }
 

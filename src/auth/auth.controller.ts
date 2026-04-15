@@ -6,20 +6,22 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  BadRequestException
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiConsumes } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiConsumes,
+} from '@nestjs/swagger';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { LogoutDto } from './dto/logout.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordEmailDto } from './dto/forgot-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -43,34 +45,16 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Post('logout')
-  @ApiOperation({ summary: 'Logout user (invalidate refresh token)' })
-  logout(@Body() dto: LogoutDto) {
-    return this.authService.logout(dto.refreshToken);
+  @Post('forgot-password-email')
+  @ApiOperation({ summary: 'Generate new password and send via email' })
+  async forgotPasswordEmail(@Body() dto: ForgotPasswordEmailDto) {
+    return this.authService.forgotPasswordEmail(dto.email);
   }
 
-  @Post('refresh-token')
-  @ApiOperation({ summary: 'Generate new access token using refresh token' })
-  refreshToken(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshToken(dto.refreshToken);
-  }
-
-  @Post('forgot-password')
-  @ApiOperation({ summary: 'Request password reset email' })
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto.email);
-  }
-
-  @Post('reset-password')
-  @ApiOperation({ summary: 'Reset password using reset token' })
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.token, dto.newPassword);
-  }
-
-  @Post('verify-email')
-  @ApiOperation({ summary: 'Verify email using verification token' })
-  verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto.token);
+  @Post('verify-otp')
+  @ApiOperation({ summary: 'Verify email using OTP' })
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.email, dto.otp);
   }
 
   @Post('change-password')
