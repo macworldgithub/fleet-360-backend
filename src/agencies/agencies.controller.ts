@@ -20,8 +20,6 @@ export class AgenciesController {
   constructor(private readonly agenciesService: AgenciesService) {}
 
   @Get()
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get all agencies (admin)' })
   findAll() {
     return this.agenciesService.findAll();
