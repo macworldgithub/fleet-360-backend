@@ -39,7 +39,9 @@ export class KmLogsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Create a KM log (Trip log) with mandatory odometer photos' })
+  @ApiOperation({
+    summary: 'Create a KM log (Trip log) with mandatory odometer photos',
+  })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'startOdometerPhoto', maxCount: 1 },
@@ -51,7 +53,9 @@ export class KmLogsController {
     @Body() dto: CreateKmLogDto,
     @UploadedFiles()
     files: {
+      //@ts-ignore
       startOdometerPhoto?: Express.Multer.File[];
+      //@ts-ignore
       endOdometerPhoto?: Express.Multer.File[];
     },
   ) {
@@ -88,14 +92,17 @@ export class KmLogsController {
     @Query('toDate') toDate?: string,
   ) {
     const agencyId = req.user.agencyId;
-    return this.kmLogsService.findAll({
-      vehicleId,
-      agencyId,
-      officeId,
-      tripType,
-      fromDate,
-      toDate,
-    }, req.user.role);
+    return this.kmLogsService.findAll(
+      {
+        vehicleId,
+        agencyId,
+        officeId,
+        tripType,
+        fromDate,
+        toDate,
+      },
+      req.user.role,
+    );
   }
 
   @Get(':logId')
@@ -123,7 +130,9 @@ export class KmLogsController {
     @Body() dto: UpdateKmLogDto,
     @UploadedFiles()
     files: {
+      //@ts-ignore
       startOdometerPhoto?: Express.Multer.File[];
+      //@ts-ignore
       endOdometerPhoto?: Express.Multer.File[];
     },
   ) {

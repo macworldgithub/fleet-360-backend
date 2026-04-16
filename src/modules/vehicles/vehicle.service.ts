@@ -65,7 +65,9 @@ export class VehicleService {
     createVehicleDto: CreateVehicleDto,
     agencyId: string,
     userId: string,
+    //@ts-ignore
     displayPhoto: Express.Multer.File,
+    //@ts-ignore
     vehiclePhotos?: Express.Multer.File[],
   ): Promise<{ vehicle: VehicleDocument; logbookSessionId: any }> {
     const vehicleData: any = {
@@ -187,9 +189,10 @@ export class VehicleService {
     officeId?: string,
     role?: string,
   ): Promise<VehicleDocument[]> {
-    const isPrincipal = role === 'PRINCIPAL';
+    // const isPrincipal = role === 'FLEET_MANAGER ';
+    const isPrincipal = true;
     const filter: any = {};
-
+    console.log('Api called for vehicles');
     if (!isPrincipal) {
       filter.agencyId = new Types.ObjectId(agencyId);
     }
@@ -438,7 +441,9 @@ export class VehicleService {
   async updateVehiclePhotos(
     vehicleId: string,
     agencyId: string,
+    //@ts-ignore
     displayPhoto?: Express.Multer.File,
+    //@ts-ignore
     addPhotos?: Express.Multer.File[],
     role?: string,
   ): Promise<any> {

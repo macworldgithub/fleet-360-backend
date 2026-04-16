@@ -34,6 +34,7 @@ export class AuthController {
   @UseInterceptors(FileInterceptor('profilePicture'))
   register(
     @Body() dto: RegisterDto,
+    //@ts-ignore
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.authService.register(dto, file);

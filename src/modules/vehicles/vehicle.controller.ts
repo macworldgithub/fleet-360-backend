@@ -25,7 +25,10 @@ import {
 } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto, UpdateVehiclePhotosDto } from './dto/update-vehicle.dto';
+import {
+  UpdateVehicleDto,
+  UpdateVehiclePhotosDto,
+} from './dto/update-vehicle.dto';
 import { RemoveVehiclePhotosDto } from './dto/remove-vehicle-photos.dto';
 import { LoanRepaymentDto } from './dto/loan-repayment.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -52,7 +55,9 @@ export class VehicleController {
     @Body() createVehicleDto: CreateVehicleDto,
     @UploadedFiles()
     files: {
+      //@ts-ignore
       displayPhoto?: Express.Multer.File[];
+      //@ts-ignore
       vehiclePhotos?: Express.Multer.File[];
     },
   ) {
@@ -102,7 +107,12 @@ export class VehicleController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.vehicleService.update(vehicleId, updateVehicleDto, agencyId, role);
+    return this.vehicleService.update(
+      vehicleId,
+      updateVehicleDto,
+      agencyId,
+      role,
+    );
   }
 
   @Delete(':vehicleId')
@@ -125,7 +135,8 @@ export class VehicleController {
 
   @Patch(':vehicleId/loan-repayment')
   @ApiOperation({
-    summary: 'Make a loan repayment — deducts amount from vehicle loanAmount (LOAN vehicles only)',
+    summary:
+      'Make a loan repayment — deducts amount from vehicle loanAmount (LOAN vehicles only)',
   })
   makeLoanRepayment(
     @Req() req,
@@ -134,7 +145,12 @@ export class VehicleController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.vehicleService.makeLoanRepayment(vehicleId, dto.amount, agencyId, role);
+    return this.vehicleService.makeLoanRepayment(
+      vehicleId,
+      dto.amount,
+      agencyId,
+      role,
+    );
   }
 
   @Get(':vehicleId/loan-history')
@@ -144,13 +160,18 @@ export class VehicleController {
   getLoanHistory(@Req() req, @Param('vehicleId') vehicleId: string) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.vehicleService.getLoanRepaymentHistory(vehicleId, agencyId, role);
+    return this.vehicleService.getLoanRepaymentHistory(
+      vehicleId,
+      agencyId,
+      role,
+    );
   }
 
   @Patch(':vehicleId/photos')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Update vehicle display photo or append gallery photos (Binary upload)',
+    summary:
+      'Update vehicle display photo or append gallery photos (Binary upload)',
   })
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -163,7 +184,9 @@ export class VehicleController {
     @Param('vehicleId') vehicleId: string,
     @UploadedFiles()
     files: {
+      //@ts-ignore
       displayPhoto?: Express.Multer.File[];
+      //@ts-ignore
       addPhotos?: Express.Multer.File[];
     },
   ) {
@@ -189,6 +212,11 @@ export class VehicleController {
   ) {
     const agencyId = req.user.agencyId;
     const role = req.user.role;
-    return this.vehicleService.removeVehiclePhotos(vehicleId, dto, agencyId, role);
+    return this.vehicleService.removeVehiclePhotos(
+      vehicleId,
+      dto,
+      agencyId,
+      role,
+    );
   }
 }
